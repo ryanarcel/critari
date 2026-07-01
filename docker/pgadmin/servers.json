@@ -1,0 +1,15 @@
+{
+    "Servers": {
+        "1": {
+            "Name": "Critari (local)",
+            "Group": "Servers",
+            "Host": "pgsql",
+            "Port": 5432,
+            "MaintenanceDB": "landlord_db",
+            "Username": "sail",
+            "Password": "password",
+            "SSLMode": "prefer",
+            "PassFile": "/pgpass"
+        }
+    }
+}
