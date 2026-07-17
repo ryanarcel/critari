@@ -156,7 +156,9 @@ return [
     |
     */
 
-    'domain' => env('SESSION_DOMAIN'),
+    // Use a sensible default for local development so cookies are shared
+    // across subdomains (e.g. app.localhost and tenant.localhost).
+    'domain' => env('SESSION_DOMAIN', '.localhost'),
 
     /*
     |--------------------------------------------------------------------------
@@ -169,7 +171,8 @@ return [
     |
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    // For local development we default to false; in production set SESSION_SECURE_COOKIE=true
+    'secure' => env('SESSION_SECURE_COOKIE', false),
 
     /*
     |--------------------------------------------------------------------------
