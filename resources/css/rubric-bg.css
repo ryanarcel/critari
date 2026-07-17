@@ -1,0 +1,13 @@
+/* Subtle repeating SVG background for Rubric Builder */
+.svg-pattern-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: -20;
+  background-repeat: repeat;
+  background-size: 300px 300px;
+  background-image: url('/images/gemini-svg.svg');
+  opacity: 0.06;
+  filter: blur(2px);
+  transition: opacity 150ms ease-in-out, filter 150ms ease-in-out;
+}

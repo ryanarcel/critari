@@ -1,5 +1,7 @@
 import '../css/app.css';
+import '../css/rubric-bg.css';
 import './bootstrap';
+import 'flowbite';
 
 import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';

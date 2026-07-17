@@ -10,7 +10,7 @@ const user = computed(() => (page.props.auth as { user: { name: string } | null 
     <Head title="Home" />
 
     <div
-        class="min-h-screen overflow-x-hidden bg-slate-950 text-slate-100 antialiased selection:bg-indigo-500/30 selection:text-indigo-200"
+        class="min-h-screen overflow-x-hidden bg-white text-slate-100 antialiased selection:bg-indigo-500/30 selection:text-indigo-200"
     >
         <!-- Background grid + glow -->
         <div
@@ -22,7 +22,7 @@ const user = computed(() => (page.props.auth as { user: { name: string } | null 
 
         <!-- Nav -->
         <nav
-            class="sticky top-0 z-50 border-b border-slate-900/80 bg-slate-950/70 px-6 py-4 backdrop-blur-xl"
+            class="sticky top-0 z-50 border-b border-slate-900/80 bg-white px-6 py-4 backdrop-blur-xl"
         >
             <div class="mx-auto flex max-w-7xl items-center justify-between">
                 <span class="text-xl font-black tracking-tight text-white">
@@ -77,7 +77,7 @@ const user = computed(() => (page.props.auth as { user: { name: string } | null 
             </div>
 
             <h1
-                class="mx-auto mb-8 max-w-4xl text-4xl font-extrabold leading-[1.15] tracking-tight text-white sm:text-6xl"
+                class="mx-auto mb-8 max-w-4xl text-4xl font-extrabold leading-[1.15] tracking-tight text-slate-900 sm:text-6xl"
             >
                 End Teacher Burnout with
                 <span
@@ -99,10 +99,10 @@ const user = computed(() => (page.props.auth as { user: { name: string } | null 
                 class="mx-auto flex max-w-md flex-col items-center justify-center gap-4 sm:flex-row"
             >
                 <Link
-                    :href="route('register')"
+                    :href="route('demos.index')"
                     class="w-full rounded-xl bg-indigo-600 px-8 py-4 text-center text-sm font-bold tracking-wide text-white shadow-lg shadow-indigo-600/20 transition-all hover:bg-indigo-500 sm:w-auto"
                 >
-                    Reclaim Your Weekends
+                    Try the demo
                 </Link>
                 <a
                     href="https://github.com"
