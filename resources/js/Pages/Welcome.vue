@@ -22,18 +22,18 @@ const user = computed(() => (page.props.auth as { user: { name: string } | null 
 
         <!-- Nav -->
         <nav
-            class="sticky top-0 z-50 border-b border-slate-900/80 bg-white px-6 py-4 backdrop-blur-xl"
+            class="sticky top-0 z-50 border-b border-indigo-700 bg-indigo-600 px-6 py-4 backdrop-blur-xl"
         >
             <div class="mx-auto flex max-w-7xl items-center justify-between">
                 <span class="text-xl font-black tracking-tight text-white">
-                    critary<span class="text-indigo-500">.</span>
+                    critari<span class="text-indigo-200">.</span>
                 </span>
 
                 <div
-                    class="hidden items-center space-x-8 text-xs font-semibold uppercase tracking-wider text-slate-400 md:flex"
+                    class="hidden items-center space-x-8 text-xs font-semibold uppercase tracking-wider text-indigo-100 md:flex"
                 >
-                    <a href="#pipeline" class="transition-colors hover:text-indigo-400">Pipeline</a>
-                    <a href="#isolation" class="transition-colors hover:text-indigo-400"
+                    <a href="#pipeline" class="transition-colors hover:text-white">Pipeline</a>
+                    <a href="#isolation" class="transition-colors hover:text-white"
                         >Data Security</a
                     >
                 </div>
@@ -42,7 +42,7 @@ const user = computed(() => (page.props.auth as { user: { name: string } | null 
                     <template v-if="user">
                         <Link
                             :href="route('dashboard')"
-                            class="text-xs font-bold uppercase tracking-wider text-slate-400 transition-colors hover:text-white"
+                            class="text-xs font-bold uppercase tracking-wider text-indigo-100 transition-colors hover:text-white"
                         >
                             Dashboard
                         </Link>
@@ -50,13 +50,13 @@ const user = computed(() => (page.props.auth as { user: { name: string } | null 
                     <template v-else>
                         <Link
                             :href="route('login')"
-                            class="text-xs font-bold uppercase tracking-wider text-slate-400 transition-colors hover:text-white"
+                            class="text-xs font-bold uppercase tracking-wider text-indigo-100 transition-colors hover:text-white"
                         >
                             Sign In
                         </Link>
                         <Link
                             :href="route('register')"
-                            class="rounded-lg border border-slate-800 bg-slate-900 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-200 transition-all hover:text-white"
+                            class="rounded-lg border border-indigo-400 bg-indigo-700 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-indigo-800"
                         >
                             Get Started
                         </Link>
@@ -90,7 +90,7 @@ const user = computed(() => (page.props.auth as { user: { name: string } | null 
             <p
                 class="mx-auto mb-12 max-w-2xl text-base font-light leading-relaxed text-slate-400 sm:text-lg"
             >
-                Stop spending your weekends staring at stacks of papers. Critary reads, scores, and
+                Stop spending your weekends staring at stacks of papers. Critari reads, scores, and
                 generates deep inline feedback mapped perfectly to your classroom rubrics—cutting
                 grading workloads from days to seconds.
             </p>

@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { ArrowDownOnSquareIcon, XMarkIcon, PlusIcon, PencilIcon, CheckIcon, LightBulbIcon } from '@heroicons/vue/24/outline';
-import { Head } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
+
+const page = usePage();
+const user = computed(() => (page.props.auth as { user: { name: string } | null })?.user ?? null);
 
 // Rubric editor state following the attachment layout
 const title = ref('');
@@ -111,6 +114,52 @@ const form = ref({
 	<Head title="Rubric Editor — Critari" />
 
 	<div class="min-h-screen text-slate-900 relative overflow-hidden">
+		<!-- Nav -->
+		<nav
+			class="sticky top-0 z-50 border-b border-indigo-700 bg-indigo-600 px-6 py-4 backdrop-blur-xl"
+		>
+			<div class="mx-auto flex max-w-7xl items-center justify-between">
+				<Link :href="route('demos.index')" class="text-xl font-black tracking-tight text-white">
+					critari<span class="text-indigo-200">.</span>
+				</Link>
+
+				<div
+					class="hidden items-center space-x-8 text-xs font-semibold uppercase tracking-wider text-indigo-100 md:flex"
+				>
+					<a href="#pipeline" class="transition-colors hover:text-white">Pipeline</a>
+					<a href="#isolation" class="transition-colors hover:text-white"
+						>Data Security</a
+					>
+				</div>
+
+				<div class="flex items-center space-x-4">
+					<template v-if="user">
+						<Link
+							:href="route('dashboard')"
+							class="text-xs font-bold uppercase tracking-wider text-indigo-100 transition-colors hover:text-white"
+						>
+							Dashboard
+						</Link>
+					</template>
+					<template v-else>
+						<Link
+							:href="route('login')"
+							class="text-xs font-bold uppercase tracking-wider text-indigo-100 transition-colors hover:text-white"
+						>
+							Sign In
+						</Link>
+						<Link
+							:href="route('register')"
+							class="rounded-lg border border-indigo-400 bg-indigo-700 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-indigo-800"
+						>
+							Get Started
+						</Link>
+					</template>
+				</div>
+			</div>
+		</nav>
+
+		<!-- decorative SVG pattern background is applied globally via resources/css/rubric-bg.css -->
 
 		<div class="max-w-6xl mx-auto px-6 py-10 relative">
 			<header class="mb-6">
