@@ -12,7 +12,9 @@ class CreateCriteriaTable extends Migration
             $table->id();
             $table->unsignedBigInteger('assignment_id')->index();
             $table->string('key');
+            $table->string('name')->nullable();
             $table->text('description')->nullable();
+            $table->json('cells')->nullable();
             $table->decimal('weight', 5, 2)->default(1.00);
             $table->json('config')->nullable();
             $table->integer('order')->default(0)->index();

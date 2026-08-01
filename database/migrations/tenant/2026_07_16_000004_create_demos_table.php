@@ -10,7 +10,6 @@ class CreateDemosTable extends Migration
     {
         Schema::create('demos', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('tenant_id')->index();
             $table->unsignedBigInteger('user_id')->nullable()->index();
             $table->string('title');
             $table->text('description')->nullable();

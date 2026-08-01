@@ -12,6 +12,9 @@ class Demo extends Model
     protected $table = 'demos';
 
     protected $fillable = [
+        'title',
+        'name',
+        'body',
         'demo_key',
     ];
 

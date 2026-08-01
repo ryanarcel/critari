@@ -10,7 +10,6 @@ class CreateAssignmentsTable extends Migration
     {
         Schema::create('assignments', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('tenant_id')->index();
             $table->unsignedBigInteger('demo_id')->nullable()->index();
             $table->string('title');
             $table->text('description')->nullable();
