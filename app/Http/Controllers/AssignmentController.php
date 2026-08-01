@@ -5,7 +5,12 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use OpenAI\Laravel\Facades\OpenAI;
+use App\Models\Demo;
+use App\Models\Assignment;
+use App\Models\Criterion;
 
 class AssignmentController extends Controller
 {
@@ -30,9 +35,59 @@ class AssignmentController extends Controller
      */
     public function store(Request $request)
     {
-        return $request->all();
+        // Validate incoming data
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'question' => 'required|string',
+            'levels' => 'required|array|min:1',
+            'criteria' => 'required|array|min:1',
+        ]);
 
-        return 'test';
+        try {
+            // Wrap database operations in a transaction
+            $result = DB::transaction(function () use ($validated) {
+                // 1. Create a Demo record (parent)
+                $demo = Demo::create([
+                    'title' => $validated['title'],
+                ]);
+
+                // 2. Create an Assignment record
+                $assignment = Assignment::create([
+                    'demo_id' => $demo->id,
+                    'title' => $validated['title'],
+                    'description' => $validated['question'], // Maps 'question' to 'description'
+                    'levels' => json_encode($validated['levels']), // Store levels as JSON
+                ]);
+
+                // 3. Create Criterion records for each criteria
+                foreach ($validated['criteria'] as $criteriaItem) {
+                    Criterion::create([
+                        'assignment_id' => $assignment->id,
+                        'key' => Str::slug($criteriaItem['name']),
+                        'name' => $criteriaItem['name'],
+                        'cells' => json_encode($criteriaItem['cells']),
+                    ]);
+                }
+
+                return [
+                    'assignment_id' => $assignment->id,
+                    'demo_id' => $demo->id,
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Assignment created successfully',
+                'data' => $result,
+            ], 201);
+
+        } catch (\Exception $e) {
+            Log::error('Assignment Store Failure: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create assignment: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**
@@ -69,23 +124,37 @@ class AssignmentController extends Controller
 
     public function getAIRubricSuggestion(Request $request): JsonResponse
     {
-        $validated =$request->validate([
-            'question' => 'required|string',
-            'levels' => 'required|array|min:1', // Needs to contain your current columns
+        $validated = $request->validate([
+            'question' => 'nullable|string',
+            'title' => 'nullable|string',
+            'levels' => 'required|array|min:1',
         ]);
 
-        $question =$validated['question'];
-        $levels =$validated['levels'];
+        // Ensure at least one of question or title is provided
+        if (empty($validated['question']) && empty($validated['title'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Either a question or a rubric title must be provided.'
+            ], 400);
+        }
+
+        $question = $validated['question'];
+        $title = $validated['title'];
+        $levels = $validated['levels'];
 
         // Format levels for prompt context
         $levelsFormatted = collect($levels)
             ->map(fn($lvl) => "- {$lvl['name']} ({$lvl['range']} pts)")
             ->implode("\n");
 
-        $prompt = "You are an expert academic assessment designer. Your task is to generate a comprehensive grading rubric tailored specifically for the following assessment question:
+        // Use question if available, otherwise fall back to title
+        $context = $question ?? $title;
+        $contextLabel = $question ? 'QUESTION' : 'RUBRIC TITLE';
 
-                QUESTION:
-                '{$question}'
+        $prompt = "You are an expert academic assessment designer. Your task is to generate a comprehensive grading rubric tailored specifically for the following assessment:
+
+                {$contextLabel}:
+                '{$context}'
 
                 COLUMNS / PERFORMANCE LEVELS:
                 {$levelsFormatted}
@@ -100,7 +169,7 @@ class AssignmentController extends Controller
                     }
                 ]
                 }
-            Generate between 3 to 4 distinct criteria tailored directly to the details of the question.";
+            Generate between 3 to 4 distinct criteria tailored directly to the details of the " . ($question ? 'question' : 'rubric title') . ".";
 
         try {
             $response = OpenAI::chat()->create([

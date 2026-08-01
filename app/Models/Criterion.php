@@ -9,9 +9,11 @@ class Criterion extends Model
     protected $table = 'criteria';
 
     protected $fillable = [
+        'key',
         'name',
         'description',
         'assignment_id',
+        'cells',
     ];
 
     protected $casts = [

@@ -14,6 +14,7 @@ class Assignment extends Model
         'description',
         // keep `question` available at the model layer (maps to `description` column)
         'question',
+        'levels',
     ];
 
     protected $casts = [
