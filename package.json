@@ -32,6 +32,7 @@
     "dependencies": {
         "@heroicons/vue": "^2.2.0",
         "flowbite": "^4.0.2",
-        "pinia": "^4.0.2"
+        "pinia": "^4.0.2",
+        "ziggy-js": "^2.6.3"
     }
 }
