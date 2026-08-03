@@ -8,7 +8,10 @@ RUN npm run build
 
 # Stage 2: PHP Application & Web Server
 FROM php:8.3-fpm-alpine
-RUN docker-php-ext-install pdo pdo_mysql
+
+# Install PostgreSQL build dependencies and PHP extensions
+RUN apk add --no-cache postgresql-dev \
+    && docker-php-ext-install pdo pdo_pgsql pgsql
 
 # Install Nginx
 RUN apk add --no-cache nginx
