@@ -2,14 +2,14 @@
 import { computed, onMounted } from 'vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { useWizardStore } from '@/stores/demo/wizardStore';
-import WizardSidebar from '@/components/demo/WizardSidebar.vue';
-import WizardModal from '@/components/demo/WizardModal.vue';
-import WizardNavigation from '@/components/demo/WizardNavigation.vue';
-import RubricSetupStep from '@/components/demo/steps/RubricSetupStep.vue';
-import QuestionPromptStep from '@/components/demo/steps/QuestionPromptStep.vue';
-import ReviewPublishStep from '@/components/demo/steps/ReviewPublishStep.vue';
-import StudentResponseStep from '@/components/demo/steps/StudentResponseStep.vue';
-import AssessmentViewStep from '@/components/demo/steps/AssessmentViewStep.vue';
+import WizardSidebar from '@/Components/demo/WizardSidebar.vue';
+import WizardModal from '@/Components/demo/WizardModal.vue';
+import WizardNavigation from '@/Components/demo/WizardNavigation.vue';
+import RubricSetupStep from '@/Components/demo/steps/RubricSetupStep.vue';
+import QuestionPromptStep from '@/Components/demo/steps/QuestionPromptStep.vue';
+import ReviewPublishStep from '@/Components/demo/steps/ReviewPublishStep.vue';
+import StudentResponseStep from '@/Components/demo/steps/StudentResponseStep.vue';
+import AssessmentViewStep from '@/Components/demo/steps/AssessmentViewStep.vue';
 
 const page = usePage();
 const user = computed(() => (page.props.auth as { user: { name: string } | null })?.user ?? null);
@@ -227,4 +227,3 @@ const getAIRubricSuggestion = () => {
 	animation: spin 1s linear infinite;
 }
 </style>
-
