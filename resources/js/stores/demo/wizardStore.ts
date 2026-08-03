@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 
 export interface Level {
 	id: string;
@@ -13,7 +13,21 @@ export interface CriterionCell {
 	cells: string[];
 }
 
+export interface WizardState {
+	currentStep: number;
+	title: string;
+	question: string;
+	studentAnswer: string;
+	levels: Level[];
+	criteria: CriterionCell[];
+	aiScores: { [key: string]: number };
+	aiFeedback: { [key: string]: string };
+}
+
 export const useWizardStore = defineStore('wizard', () => {
+	// Session ID for persistence
+	const sessionId = ref<string | null>(null);
+	
 	// Wizard state
 	const currentStep = ref(1);
 	const totalSteps = 5;
@@ -194,8 +208,61 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
 
 	const currentStepData = computed(() => steps[currentStep.value - 1]);
 
+	// Persistence methods
+	const saveState = () => {
+		if (!sessionId.value) return;
+		
+		const state: WizardState = {
+			currentStep: currentStep.value,
+			title: title.value,
+			question: question.value,
+			studentAnswer: studentAnswer.value,
+			levels: levels.value,
+			criteria: criteria.value,
+			aiScores: aiScores.value,
+			aiFeedback: aiFeedback.value,
+		};
+		
+		try {
+			localStorage.setItem(`wizard-session-${sessionId.value}`, JSON.stringify(state));
+		} catch (e) {
+			console.error('Failed to save wizard state:', e);
+		}
+	};
+
+	const loadState = (newSessionId: string) => {
+		sessionId.value = newSessionId;
+		
+		try {
+			const saved = localStorage.getItem(`wizard-session-${newSessionId}`);
+			if (saved) {
+				const state = JSON.parse(saved) as WizardState;
+				currentStep.value = state.currentStep;
+				title.value = state.title;
+				question.value = state.question;
+				studentAnswer.value = state.studentAnswer;
+				levels.value = state.levels;
+				criteria.value = state.criteria;
+				aiScores.value = state.aiScores;
+				aiFeedback.value = state.aiFeedback;
+			}
+		} catch (e) {
+			console.error('Failed to load wizard state:', e);
+		}
+	};
+
+	// Watch for state changes and auto-save
+	watch(
+		() => [currentStep.value, title.value, question.value, studentAnswer.value, levels.value, criteria.value],
+		() => {
+			saveState();
+		},
+		{ deep: true }
+	);
+
 	return {
 		// State
+		sessionId,
 		currentStep,
 		totalSteps,
 		steps,
@@ -225,5 +292,7 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
 		prevStep,
 		goToStep,
 		resetForm,
+		saveState,
+		loadState,
 	};
 });

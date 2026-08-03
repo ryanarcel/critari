@@ -50,13 +50,13 @@
 				v-if="wizard.currentStep === 3"
 				type="button"
 				class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition shadow" 
-				@click.prevent="emit('publish')"
+				@click.prevent="publishAndProceed"
 			>
 				<ArrowDownOnSquareIcon class="w-4 h-4" />
-				<span>Publish</span>
+				<span>Publish & Proceed</span>
 			</button>
 			<button 
-				v-if="wizard.currentStep >= 3 && wizard.currentStep < 5"
+				v-if="wizard.currentStep === 4"
 				type="button"
 				class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition shadow" 
 				@click.prevent="wizard.nextStep"
@@ -86,6 +86,13 @@ const submitStudentAnswer = () => {
 			wizard.nextStep();
 		}, 1000);
 	}
+};
+
+const publishAndProceed = () => {
+	emit('publish');
+	setTimeout(() => {
+		wizard.nextStep();
+	}, 1000);
 };
 
 const startOver = () => {
