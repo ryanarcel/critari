@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { useWizardStore } from '@/stores/demo/wizardStore';
 import WizardSidebar from '@/components/demo/WizardSidebar.vue';
@@ -15,6 +15,16 @@ const page = usePage();
 const user = computed(() => (page.props.auth as { user: { name: string } | null })?.user ?? null);
 const axios = (window as any).axios;
 const wizard = useWizardStore();
+
+// Get sessionId from route params
+const sessionId = computed(() => (page.props as { sessionId?: string }).sessionId);
+
+// Load session state on mount
+onMounted(() => {
+	if (sessionId.value) {
+		wizard.loadState(sessionId.value);
+	}
+});
 
 const saveRubric = (publish = false) => {
 	// Validate all steps before proceeding
@@ -33,9 +43,12 @@ const saveRubric = (publish = false) => {
 	axios.post(route('assignments.store'), payload)
 		.then(() => {
 			wizard.showModal('Success', `Your rubric has been ${publish ? 'published' : 'saved as draft'} successfully!`, 'success');
-			setTimeout(() => {
-				wizard.resetForm();
-			}, 1500);
+			// Only reset form if saving as draft, not on publish
+			if (!publish) {
+				setTimeout(() => {
+					wizard.resetForm();
+				}, 1500);
+			}
 		})
 		.catch(err => {
 			console.error(err);

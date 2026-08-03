@@ -4,6 +4,15 @@ import { Head, Link, usePage } from '@inertiajs/vue3';
 
 const page = usePage();
 const user = computed(() => (page.props.auth as { user: { name: string } | null })?.user ?? null);
+
+const generateSessionId = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 20; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+};
 </script>
 
 <template>
@@ -99,7 +108,7 @@ const user = computed(() => (page.props.auth as { user: { name: string } | null 
                 class="mx-auto flex max-w-md flex-col items-center justify-center gap-4 sm:flex-row"
             >
                 <Link
-                    :href="route('demos.index')"
+                    :href="route('demos.session', { sessionId: generateSessionId() })"
                     class="w-full rounded-xl bg-indigo-600 px-8 py-4 text-center text-sm font-bold tracking-wide text-white shadow-lg shadow-indigo-600/20 transition-all hover:bg-indigo-500 sm:w-auto"
                 >
                     Try the demo

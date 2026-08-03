@@ -18,6 +18,10 @@ Route::middleware(['web', InitializeTenancyBySubdomain::class, PreventAccessFrom
             return Inertia::render('Demo/Index');
         })->name('demos.index');
 
+        Route::get('/demos/{sessionId}', function ($sessionId) {
+            return Inertia::render('Demo/Index', ['sessionId' => $sessionId]);
+        })->name('demos.session');
+
         Route::resource('assignments', AssignmentController::class);
 
         Route::post('/assignments/ai-rubric-suggestion', [AssignmentController::class, 'getAIRubricSuggestion'])
