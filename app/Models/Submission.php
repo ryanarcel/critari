@@ -11,16 +11,25 @@ class Submission extends Model
     protected $fillable = [
         'assignment_id',
         'user_id',
-        'student_response',
+        'demo_id',
+        'payload',
+        'score',
         'status',
-        'telemetry',
+        'submitted_at',
+        'graded_at',
+        'grader_id',
     ];
 
     protected $casts = [
         'id' => 'integer',
         'assignment_id' => 'integer',
         'user_id' => 'integer',
-        'telemetry' => 'array',
+        'demo_id' => 'integer',
+        'grader_id' => 'integer',
+        'score' => 'decimal:3',
+        'payload' => 'array',
+        'submitted_at' => 'datetime',
+        'graded_at' => 'datetime',
     ];
 
     public function assignment()

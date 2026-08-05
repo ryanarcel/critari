@@ -11,7 +11,7 @@ class CreateSubmissionsTable extends Migration
         Schema::create('submissions', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('assignment_id')->index();
-            $table->unsignedBigInteger('user_id')->index();
+            $table->unsignedBigInteger('user_id')->nullable()->index();
             $table->unsignedBigInteger('demo_id')->nullable()->index();
             $table->json('payload')->nullable();
             $table->decimal('score', 8, 3)->nullable()->index();

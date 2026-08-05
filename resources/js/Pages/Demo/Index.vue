@@ -37,11 +37,18 @@ const saveRubric = (publish = false) => {
 		question: wizard.question,
 		levels: wizard.levels.slice(),
 		criteria: wizard.criteria.map(c => ({ id: c.id, name: c.name, cells: c.cells.slice() })),
+		session_id: sessionId.value || null,
 		publish,
 	};
 
 	axios.post(route('assignments.store'), payload)
-		.then(() => {
+		.then((res) => {
+			// Store assignment_id and demo_id in wizard store for later use in assessment
+			if (res.data.data) {
+				wizard.assignment_id = res.data.data.assignment_id;
+				wizard.demo_id = res.data.data.demo_id;
+			}
+			
 			wizard.showModal('Success', `Your rubric has been ${publish ? 'published' : 'saved as draft'} successfully!`, 'success');
 			// Only reset form if saving as draft, not on publish
 			if (!publish) {
