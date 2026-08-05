@@ -22,11 +22,25 @@ export interface WizardState {
 	criteria: CriterionCell[];
 	aiScores: { [key: string]: number };
 	aiFeedback: { [key: string]: string };
+	assignment_id: number | null;
+	demo_id: number | null;
+	submission_id: number | null;
+	maxScore: number | null;
+	assessmentComplete: boolean;
 }
 
 export const useWizardStore = defineStore('wizard', () => {
 	// Session ID for persistence
 	const sessionId = ref<string | null>(null);
+	
+	// Database references
+	const assignment_id = ref<number | null>(null);
+	const demo_id = ref<number | null>(null);
+	const submission_id = ref<number | null>(null);
+	const maxScore = ref<number | null>(null);
+	
+	// Assessment tracking - once true, all steps remain navigatable
+	const assessmentComplete = ref(false);
 	
 	// Wizard state
 	const currentStep = ref(1);
@@ -87,6 +101,9 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
 
 	// AI Suggestion loading state
 	const isLoadingAI = ref(false);
+	
+	// Assessment submission loading state
+	const isSubmittingAssessment = ref(false);
 
 	// Modal methods
 	const showModal = (modalTitleArg: string, message: string, type: 'error' | 'success' | 'info' = 'info') => {
@@ -182,7 +199,9 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
 	};
 
 	const goToStep = (step: number) => {
-		if (step <= currentStep.value) {
+		// If assessment is complete, allow full navigation between all steps
+		// Otherwise, only allow backward navigation (to steps already visited)
+		if (assessmentComplete.value || step <= currentStep.value) {
 			currentStep.value = step;
 		}
 	};
@@ -203,10 +222,40 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
 			{ id: 'c-coherency', name: 'Coherency', cells: ['Lacks coherency', 'Somewhat coherent', 'Coherent writing', 'Extremely coherent writing'] },
 			{ id: 'c-grammar', name: 'Grammar', cells: ['Many errors that hurt understanding', 'Many errors', 'Some errors', 'Few errors'] },
 		];
+		assignment_id.value = null;
+		demo_id.value = null;
+		submission_id.value = null;
+		maxScore.value = null;
+		assessmentComplete.value = false;
 		currentStep.value = 1;
 	};
 
 	const currentStepData = computed(() => steps[currentStep.value - 1]);
+	
+	// Set assessment results from AI grading
+	const setAssessmentResults = (scores: Array<{ criterion_name: string; score: number; feedback: string }>, maxScoreFromAPI?: number) => {
+		const scoresMap: { [key: string]: number } = {};
+		const feedbackMap: { [key: string]: string } = {};
+		
+		scores.forEach((item) => {
+			// Find matching criterion by name
+			const criterion = criteria.value.find(c => c.name === item.criterion_name);
+			if (criterion) {
+				scoresMap[criterion.id] = item.score;
+				feedbackMap[criterion.id] = item.feedback;
+			}
+		});
+		
+		aiScores.value = scoresMap;
+		aiFeedback.value = feedbackMap;
+		if (maxScoreFromAPI !== undefined) {
+			maxScore.value = maxScoreFromAPI;
+		}
+		
+		// Mark assessment as complete - enables full sidebar navigation
+		assessmentComplete.value = true;
+		saveState();
+	};
 
 	// Persistence methods
 	const saveState = () => {
@@ -221,6 +270,11 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
 			criteria: criteria.value,
 			aiScores: aiScores.value,
 			aiFeedback: aiFeedback.value,
+			assignment_id: assignment_id.value,
+			demo_id: demo_id.value,
+			submission_id: submission_id.value,
+			maxScore: maxScore.value,
+			assessmentComplete: assessmentComplete.value,
 		};
 		
 		try {
@@ -245,6 +299,11 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
 				criteria.value = state.criteria;
 				aiScores.value = state.aiScores;
 				aiFeedback.value = state.aiFeedback;
+				assignment_id.value = state.assignment_id || null;
+				demo_id.value = state.demo_id || null;
+				submission_id.value = state.submission_id || null;
+				maxScore.value = state.maxScore || null;
+				assessmentComplete.value = state.assessmentComplete || false;
 			}
 		} catch (e) {
 			console.error('Failed to load wizard state:', e);
@@ -268,6 +327,7 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
 		steps,
 		isModalOpen,
 		modalTitle,
+		maxScore,
 		modalMessage,
 		modalType,
 		title,
@@ -279,7 +339,12 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
 		aiScores,
 		aiFeedback,
 		isLoadingAI,
+		isSubmittingAssessment,
 		currentStepData,
+		assignment_id,
+		demo_id,
+		submission_id,
+		assessmentComplete,
 		// Methods
 		showModal,
 		closeModal,
@@ -292,6 +357,7 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
 		prevStep,
 		goToStep,
 		resetForm,
+		setAssessmentResults,
 		saveState,
 		loadState,
 	};

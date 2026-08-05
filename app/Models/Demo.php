@@ -13,9 +13,12 @@ class Demo extends Model
 
     protected $fillable = [
         'title',
-        'name',
-        'body',
-        'demo_key',
+        'session_id',
+        'description',
+        'user_id',
+        'visibility',
+        'config',
+        'metadata',
     ];
 
     protected $casts = [

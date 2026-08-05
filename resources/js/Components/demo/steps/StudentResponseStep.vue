@@ -26,33 +26,11 @@
 				</div>
 			</div>
 		</div>
-
-		<!-- Helper Actions -->
-		<div class="bg-slate-50 border border-slate-200 rounded-xl p-6 flex gap-3">
-			<button 
-				type="button"
-				class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-white border border-slate-200 text-sm text-slate-700 hover:bg-slate-100 transition" 
-				@click.prevent="loadSampleAnswer"
-			>
-				<LightBulbIcon class="w-4 h-4" />
-				<span>Load Sample Answer</span>
-			</button>
-			<p class="text-xs text-slate-600 flex items-center">Use this to preview how the AI assessment works with pre-written content.</p>
-		</div>
 	</div>
 </template>
 
 <script setup lang="ts">
-import { LightBulbIcon } from '@heroicons/vue/24/outline';
 import { useWizardStore } from '@/stores/demo/wizardStore';
 
 const wizard = useWizardStore();
-
-const loadSampleAnswer = () => {
-	const sampleKey = 'narrative-essay';
-	if (wizard.sampleAnswers[sampleKey as keyof typeof wizard.sampleAnswers]) {
-		wizard.studentAnswer = wizard.sampleAnswers[sampleKey as keyof typeof wizard.sampleAnswers];
-		wizard.showModal('Sample Loaded', 'Sample answer loaded. You can edit it as needed.', 'success');
-	}
-};
 </script>

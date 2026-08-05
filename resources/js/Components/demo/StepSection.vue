@@ -8,11 +8,12 @@
 				type="button"
 				:class="{
 					'bg-indigo-600 border border-indigo-500 shadow-lg': wizard.currentStep === step.id,
-					'bg-indigo-700/50 hover:bg-indigo-700/70 border border-indigo-600': wizard.currentStep !== step.id,
-					'opacity-50 cursor-not-allowed': step.id > wizard.currentStep,
-					'cursor-pointer': step.id <= wizard.currentStep
+					'bg-indigo-700/50 border border-indigo-600': wizard.currentStep !== step.id && (step.id <= wizard.currentStep || wizard.assessmentComplete),
+					'hover:bg-indigo-600/70': step.id <= wizard.currentStep || wizard.assessmentComplete,
+					'opacity-50 cursor-not-allowed bg-indigo-900/30 border border-indigo-700': step.id > wizard.currentStep && !wizard.assessmentComplete,
+					'cursor-pointer': step.id <= wizard.currentStep || wizard.assessmentComplete
 				}"
-				:disabled="step.id > wizard.currentStep"
+				:disabled="step.id > wizard.currentStep && !wizard.assessmentComplete"
 				class="w-full text-left p-4 rounded-lg transition-all duration-200 relative"
 				@click="wizard.goToStep(step.id)"
 			>

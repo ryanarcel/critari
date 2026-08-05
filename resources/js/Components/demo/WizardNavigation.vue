@@ -23,10 +23,11 @@
 			<button 
 				v-if="wizard.currentStep === 4"
 				type="button"
-				class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition shadow" 
+				:disabled="wizard.isSubmittingAssessment"
+				class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition shadow disabled:opacity-50 disabled:cursor-not-allowed" 
 				@click.prevent="submitStudentAnswer"
 			>
-				<span>Submit Answer</span>
+				<span>{{ wizard.isSubmittingAssessment ? 'Assessing...' : 'Submit Answer' }}</span>
 				<ArrowRightIcon class="w-4 h-4" />
 			</button>
 			<button 
@@ -71,6 +72,7 @@
 <script setup lang="ts">
 import { ArrowLeftIcon, ArrowRightIcon, ArrowDownOnSquareIcon } from '@heroicons/vue/24/outline';
 import { useWizardStore } from '@/stores/demo/wizardStore';
+import axios from 'axios';
 
 const wizard = useWizardStore();
 
@@ -79,12 +81,58 @@ const emit = defineEmits<{
 	'publish': [];
 }>();
 
-const submitStudentAnswer = () => {
-	if (wizard.validateStep(4)) {
-		wizard.showModal('Submitted', 'Student answer submitted for assessment!', 'success');
+const submitStudentAnswer = async () => {
+	if (!wizard.validateStep(4)) return;
+	
+	if (!wizard.assignment_id) {
+		wizard.showModal('Error', 'No assignment found. Please publish the rubric first.', 'error');
+		return;
+	}
+	
+	wizard.isSubmittingAssessment = true;
+	
+	try {
+		// Step 1: Save student submission
+		const submissionRes = await axios.post('/submissions', {
+			assignment_id: wizard.assignment_id,
+			student_response: wizard.studentAnswer,
+			demo_id: wizard.demo_id,
+		});
+		
+		if (!submissionRes.data.success) {
+			wizard.showModal('Error', 'Failed to save submission', 'error');
+			wizard.isSubmittingAssessment = false;
+			return;
+		}
+		
+		const submissionId = submissionRes.data.submission_id;
+		wizard.submission_id = submissionId;
+		
+		// Step 2: Process AI assessment
+		const assessmentRes = await axios.post(`/submissions/${submissionId}/assess`, {
+			submission_id: submissionId,
+		});
+		
+		if (!assessmentRes.data.success) {
+			wizard.showModal('Error', 'Failed to process assessment', 'error');
+			wizard.isSubmittingAssessment = false;
+			return;
+		}
+		
+		// Step 3: Store assessment results in wizard store
+		wizard.setAssessmentResults(assessmentRes.data.scores, assessmentRes.data.max_score);
+		
+		// Step 4: Show success and advance
+		wizard.showModal('Assessed', 'Student answer assessed successfully!', 'success');
 		setTimeout(() => {
 			wizard.nextStep();
+			wizard.isSubmittingAssessment = false;
 		}, 1000);
+		
+	} catch (error: any) {
+		const message = error.response?.data?.message || 'An error occurred during assessment';
+		wizard.showModal('Error', message, 'error');
+		wizard.isSubmittingAssessment = false;
 	}
 };
 

@@ -27,7 +27,7 @@
 								<h4 class="text-sm font-semibold text-slate-700">{{ crit.name }}</h4>
 								<div class="flex items-center gap-2">
 									<span class="text-lg font-bold text-indigo-600">{{ wizard.aiScores[crit.id] || 0 }}</span>
-									<span class="text-xs text-slate-500">/ {{ wizard.levels.length }}</span>
+								<span class="text-xs text-slate-500">/ {{ wizard.levels.length - 1 }}</span>
 								</div>
 							</div>
 							<div class="flex gap-1">
@@ -48,7 +48,7 @@
 				<div class="border-t border-slate-200 pt-4 mt-4">
 					<div class="flex items-center justify-between">
 						<span class="text-sm font-semibold text-slate-700">Total Score</span>
-						<span class="text-2xl font-bold text-indigo-600">{{ Object.values(wizard.aiScores).reduce((a, b) => a + b, 0) }} / {{ wizard.levels.length * wizard.criteria.length }}</span>
+						<span class="text-2xl font-bold text-indigo-600">{{ Object.values(wizard.aiScores).reduce((a, b) => a + b, 0) }} / {{ wizard.maxScore }}</span>
 					</div>
 				</div>
 			</div>

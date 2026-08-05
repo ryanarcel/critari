@@ -15,11 +15,14 @@ class Assignment extends Model
         // keep `question` available at the model layer (maps to `description` column)
         'question',
         'levels',
+        'max_score',
     ];
 
     protected $casts = [
         'id' => 'integer',
         'demo_id' => 'integer',
+        'max_score' => 'integer',
+        'levels' => 'array',
     ];
 
     public function demo()

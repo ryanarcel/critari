@@ -11,7 +11,7 @@ class CriterionScore extends Model
     protected $fillable = [
         'submission_id',
         'criterion_id',
-        'points_awarded',
+        'score',
         'feedback',
     ];
 

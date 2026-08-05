@@ -41,25 +41,48 @@ class AssignmentController extends Controller
             'question' => 'required|string',
             'levels' => 'required|array|min:1',
             'criteria' => 'required|array|min:1',
+            'session_id' => 'nullable|string|max:255',
         ]);
 
         try {
             // Wrap database operations in a transaction
             $result = DB::transaction(function () use ($validated) {
-                // 1. Create a Demo record (parent)
-                $demo = Demo::create([
-                    'title' => $validated['title'],
-                ]);
+                // Calculate max score based on the highest level's range
+                // E.g., if Excellent level has range "9-10", max score per criterion is 10
+                $levels = $validated['levels'];
+                $criteriaCount = count($validated['criteria']);
+                
+                // Get the last level (should be the highest scoring level)
+                $maxLevel = end($levels);
+                $rangeString = $maxLevel['range'] ?? '0-0';
+                
+                // Extract the maximum value from the range (format: "min-max")
+                $rangeParts = explode('-', $rangeString);
+                $maxScorePerCriterion = (int) end($rangeParts);
+                
+                // Calculate total max score
+                $maxScore = $maxScorePerCriterion * $criteriaCount;
 
-                // 2. Create an Assignment record
-                $assignment = Assignment::create([
-                    'demo_id' => $demo->id,
-                    'title' => $validated['title'],
-                    'description' => $validated['question'], // Maps 'question' to 'description'
-                    'levels' => json_encode($validated['levels']), // Store levels as JSON
-                ]);
+                // 1. Create or update Demo record using session_id as identifier
+                $demo = Demo::updateOrCreate(
+                    ['session_id' => $validated['session_id'] ?? null],
+                    ['title' => $validated['title']]
+                );
 
-                // 3. Create Criterion records for each criteria
+                // 2. Create or update Assignment record using demo_id as identifier
+                $assignment = Assignment::updateOrCreate(
+                    ['demo_id' => $demo->id],
+                    [
+                        'title' => $validated['title'],
+                        'description' => $validated['question'], // Maps 'question' to 'description'
+                        'levels' => $validated['levels'], // Store levels as array (will be auto-JSON encoded)
+                        'max_score' => $maxScore,
+                    ]
+                );
+
+                // 3. Delete old criteria for this assignment and recreate them
+                Criterion::where('assignment_id', $assignment->id)->delete();
+                
                 foreach ($validated['criteria'] as $criteriaItem) {
                     Criterion::create([
                         'assignment_id' => $assignment->id,

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AssignmentController;
+use App\Http\Controllers\SubmissionController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
@@ -23,6 +24,9 @@ Route::middleware(['web', InitializeTenancyBySubdomain::class, PreventAccessFrom
         })->name('demos.session');
 
         Route::resource('assignments', AssignmentController::class);
+        Route::resource('submissions', SubmissionController::class);
+        Route::post('/submissions/{submission}/assess', [SubmissionController::class, 'processAIAssessment'])
+            ->name('submissions.assess');
 
         Route::post('/assignments/ai-rubric-suggestion', [AssignmentController::class, 'getAIRubricSuggestion'])
             ->name('assignments.ai-rubric-suggestion');
