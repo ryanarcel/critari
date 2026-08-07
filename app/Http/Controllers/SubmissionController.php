@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Submission;
 use App\Models\Assignment;
 use App\Models\CriterionScore;
-use Illuminate\Http\Request;
+use App\Models\Submission;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use OpenAI\Laravel\Facades\OpenAI;
@@ -62,7 +62,7 @@ class SubmissionController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to save submission: ' . $e->getMessage(),
+                'message' => 'Failed to save submission: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -108,7 +108,7 @@ class SubmissionController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update submission: ' . $e->getMessage(),
+                'message' => 'Failed to update submission: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -140,28 +140,34 @@ class SubmissionController extends Controller
             if (empty($studentResponse)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No student response found to assess.'
+                    'message' => 'No student response found to assess.',
                 ], 400);
             }
 
             if ($assignment->criteria->isEmpty()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No criteria defined for this assignment.'
+                    'message' => 'No criteria defined for this assignment.',
                 ], 400);
             }
 
             // Format criteria info for the prompt
             $criteriaList = $assignment->criteria
-                ->map(fn($c) => "- {$c->name}")
+                ->map(fn ($c) => "- {$c->name}")
                 ->implode("\n");
 
             // Format levels for scoring context
             // $assignment->levels is already an array due to model casting
             $levels = is_array($assignment->levels) ? $assignment->levels : json_decode($assignment->levels, true);
             $levelsFormatted = collect($levels)
-                ->map(fn($lvl) => "{$lvl['name']}: {$lvl['range']} pts")
-                ->implode(", ");
+                ->map(fn ($lvl) => "{$lvl['name']}: {$lvl['range']} pts")
+                ->implode(', ');
+
+            // Calculate max score per criterion from the highest level's range
+            $maxLevel = end($levels);
+            $rangeString = $maxLevel['range'] ?? '0-0';
+            $rangeParts = explode('-', $rangeString);
+            $maxScorePerCriterion = (int) end($rangeParts);
 
             $prompt = "You are an expert academic assessor. Grade the following student response against the provided criteria.
 
@@ -183,20 +189,20 @@ class SubmissionController extends Controller
                         \"scores\": [
                             {
                                 \"criterion_name\": \"Criterion Name\",
-                                \"score\": 3,
+                                \"score\": 7,
                                 \"feedback\": \"Specific feedback for this criterion\"
                             }
                         ],
                         \"overall_feedback\": \"General assessment summary\"
                     }
 
-                    Assign scores (0-4) for each criterion based on the performance levels. Provide constructive feedback.";
+                    Assign scores (0-{$maxScorePerCriterion}) for each criterion based on the performance levels provided above. Provide constructive feedback.";
 
             $response = OpenAI::chat()->create([
                 'model' => 'gpt-4o-mini',
                 'messages' => [
                     ['role' => 'system', 'content' => 'You are a system that only speaks in valid raw JSON schemas.'],
-                    ['role' => 'user', 'content' => $prompt]
+                    ['role' => 'user', 'content' => $prompt],
                 ],
                 'temperature' => 0.5,
             ]);
@@ -206,7 +212,7 @@ class SubmissionController extends Controller
             $data = json_decode($cleanJson, true);
 
             if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new \Exception("Invalid JSON returned from AI assessment.");
+                throw new \Exception('Invalid JSON returned from AI assessment.');
             }
 
             // Store scores in a database transaction
@@ -234,7 +240,7 @@ class SubmissionController extends Controller
                     'status' => 'graded',
                     'graded_at' => now(),
                     'payload' => array_merge($submission->payload, [
-                        'overall_feedback' => $data['overall_feedback'] ?? ''
+                        'overall_feedback' => $data['overall_feedback'] ?? '',
                     ]),
                 ]);
 
@@ -249,10 +255,11 @@ class SubmissionController extends Controller
             });
 
         } catch (\Exception $e) {
-            Log::error('AI Assessment Failure: ' . $e->getMessage());
+            Log::error('AI Assessment Failure: '.$e->getMessage());
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to process assessment: ' . $e->getMessage(),
+                'message' => 'Failed to process assessment: '.$e->getMessage(),
             ], 500);
         }
     }

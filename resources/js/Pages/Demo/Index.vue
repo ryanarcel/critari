@@ -78,12 +78,23 @@ const getAIRubricSuggestion = () => {
 		question: wizard.question.trim() ? wizard.question : null,
 		title: !wizard.question.trim() ? wizard.title : null,
 		levels: wizard.levels.slice(),
+		num_criteria: wizard.criteria.length,
 	};
 
 	axios.post(route('assignments.ai-rubric-suggestion'), payload).then((res) => {
 		try {
 			const data = res.data || {};
 			if (data.success && data.rubric && Array.isArray(data.rubric.criteria)) {
+				// Update level names and ranges if provided
+				if (data.levels && Array.isArray(data.levels)) {
+					data.levels.forEach((suggestedLevel, idx) => {
+						if (idx < wizard.levels.length) {
+							wizard.levels[idx].name = suggestedLevel.name;
+							wizard.levels[idx].range = suggestedLevel.range;
+						}
+					});
+				}
+
 				// Map returned criteria into local shape
 				wizard.criteria = data.rubric.criteria.map((c, idx) => ({
 					id: `c-ai-${Date.now()}-${idx}`,
@@ -91,7 +102,7 @@ const getAIRubricSuggestion = () => {
 					cells: Array.isArray(c.cells) ? c.cells.slice() : Array(wizard.levels.length).fill(''),
 				}));
 				
-				wizard.showModal('Criteria Generated', 'AI has suggested criteria for your rubric. Review and edit as needed.', 'success');
+				wizard.showModal('Rubric Generated', 'AI has suggested level names and criteria for your rubric. Review and edit as needed.', 'success');
 			}
 		} catch (e) {
 			console.error('Failed to apply AI rubric suggestion', e);

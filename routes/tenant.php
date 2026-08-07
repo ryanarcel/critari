@@ -30,5 +30,7 @@ Route::middleware(['web', InitializeTenancyBySubdomain::class, PreventAccessFrom
 
         Route::post('/assignments/ai-rubric-suggestion', [AssignmentController::class, 'getAIRubricSuggestion'])
             ->name('assignments.ai-rubric-suggestion');
+        Route::post('/assignments/ai-levels-suggestion', [AssignmentController::class, 'getAILevelsSuggestion'])
+            ->name('assignments.ai-levels-suggestion');
 
     });

@@ -12,22 +12,34 @@
 		<div v-else></div>
 
 		<div class="flex items-center gap-3">
+			<!-- Step 3: Show only Next Step since rubric is published -->
 			<button 
 				v-if="wizard.currentStep === 3"
 				type="button"
-				class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-slate-200 bg-white text-sm text-slate-700 hover:bg-slate-50 transition" 
-				@click.prevent="emit('save-draft')"
+				class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition shadow" 
+				@click.prevent="wizard.nextStep"
 			>
-				<span>Save Draft</span>
+				<span>Next Step</span>
+				<ArrowRightIcon class="w-4 h-4" />
 			</button>
+			<!-- Step 4: Show Submit Answer if assessment not done, Next Step if done -->
 			<button 
-				v-if="wizard.currentStep === 4"
+				v-if="wizard.currentStep === 4 && !wizard.assessmentComplete"
 				type="button"
 				:disabled="wizard.isSubmittingAssessment"
 				class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition shadow disabled:opacity-50 disabled:cursor-not-allowed" 
 				@click.prevent="submitStudentAnswer"
 			>
 				<span>{{ wizard.isSubmittingAssessment ? 'Assessing...' : 'Submit Answer' }}</span>
+				<ArrowRightIcon class="w-4 h-4" />
+			</button>
+			<button 
+				v-if="wizard.currentStep === 4 && wizard.assessmentComplete"
+				type="button"
+				class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition shadow" 
+				@click.prevent="wizard.nextStep"
+			>
+				<span>Next Step</span>
 				<ArrowRightIcon class="w-4 h-4" />
 			</button>
 			<button 
@@ -45,24 +57,6 @@
 				@click.prevent="wizard.nextStep"
 			>
 				<span>Continue</span>
-				<ArrowRightIcon class="w-4 h-4" />
-			</button>
-			<button 
-				v-if="wizard.currentStep === 3"
-				type="button"
-				class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition shadow" 
-				@click.prevent="publishAndProceed"
-			>
-				<ArrowDownOnSquareIcon class="w-4 h-4" />
-				<span>Publish & Proceed</span>
-			</button>
-			<button 
-				v-if="wizard.currentStep === 4"
-				type="button"
-				class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition shadow" 
-				@click.prevent="wizard.nextStep"
-			>
-				<span>Next Step</span>
 				<ArrowRightIcon class="w-4 h-4" />
 			</button>
 		</div>

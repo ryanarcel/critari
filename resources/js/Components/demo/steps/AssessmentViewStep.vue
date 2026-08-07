@@ -27,14 +27,14 @@
 								<h4 class="text-sm font-semibold text-slate-700">{{ crit.name }}</h4>
 								<div class="flex items-center gap-2">
 									<span class="text-lg font-bold text-indigo-600">{{ wizard.aiScores[crit.id] || 0 }}</span>
-								<span class="text-xs text-slate-500">/ {{ wizard.levels.length - 1 }}</span>
+									<span class="text-xs text-slate-500">/ {{ getMaxScorePerCriterion() }}</span>
 								</div>
 							</div>
 							<div class="flex gap-1">
 								<div v-for="(level, idx) in wizard.levels" :key="level.id" 
 									:class="{
-										'bg-indigo-600': idx < (wizard.aiScores[crit.id] || 0),
-										'bg-slate-200': idx >= (wizard.aiScores[crit.id] || 0)
+										'bg-indigo-600': (wizard.aiScores[crit.id] || 0) >= getLevelMinScore(idx),
+										'bg-slate-200': (wizard.aiScores[crit.id] || 0) < getLevelMinScore(idx)
 									}"
 									class="h-2 flex-1 rounded-full transition-colors"
 								></div>
@@ -60,4 +60,22 @@
 import { useWizardStore } from '@/stores/demo/wizardStore';
 
 const wizard = useWizardStore();
+
+// Calculate max score per criterion from the highest level's range
+const getMaxScorePerCriterion = () => {
+	if (wizard.levels.length === 0) return 10;
+	const lastLevel = wizard.levels[wizard.levels.length - 1];
+	const range = lastLevel.range || '0-10';
+	const parts = range.split('-');
+	return parseInt(parts[1] || '10');
+};
+
+// Get the minimum score for a level (used for progress bar fill)
+const getLevelMinScore = (levelIndex: number) => {
+	if (levelIndex >= wizard.levels.length) return 0;
+	const level = wizard.levels[levelIndex];
+	const range = level.range || '0-0';
+	const parts = range.split('-');
+	return parseInt(parts[0] || '0');
+};
 </script>

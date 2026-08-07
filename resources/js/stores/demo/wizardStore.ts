@@ -310,6 +310,40 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
 		}
 	};
 
+	// AI Level suggestion method
+	const suggestLevels = async () => {
+		isLoadingAI.value = true;
+		const axios = (window as any).axios;
+		
+		try {
+			const payload = {
+				num_levels: levels.value.length,
+				question: question.value.trim() || null,
+				title: title.value.trim() || null,
+			};
+
+			const res = await axios.post(route('assignments.ai-levels-suggestion'), payload);
+			
+			if (res.data.success && Array.isArray(res.data.levels)) {
+				// Update level names and ranges from AI suggestions
+				res.data.levels.forEach((suggestedLevel, idx) => {
+					if (idx < levels.value.length) {
+						levels.value[idx].name = suggestedLevel.name;
+						levels.value[idx].range = suggestedLevel.range;
+					}
+				});
+				
+				showModal('Levels Suggested', 'AI has suggested performance level names for your rubric. Review and edit as needed.', 'success');
+				saveState();
+			}
+		} catch (err: any) {
+			console.error('AI Levels Suggestion failed:', err);
+			showModal('Suggestion Failed', err.response?.data?.message || 'Failed to suggest levels. Please try again.', 'error');
+		} finally {
+			isLoadingAI.value = false;
+		}
+	};
+
 	// Watch for state changes and auto-save
 	watch(
 		() => [currentStep.value, title.value, question.value, studentAnswer.value, levels.value, criteria.value],
@@ -360,5 +394,6 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
 		setAssessmentResults,
 		saveState,
 		loadState,
+		suggestLevels,
 	};
 });
