@@ -1,0 +1,44 @@
+# Git
+.git
+.gitignore
+.gitattributes
+.github
+
+# Node
+node_modules
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# PHP Composer
+vendor
+composer.lock
+
+# Laravel
+.env
+.env.*.local
+storage/logs/*
+bootstrap/cache/*
+public/hot
+public/build
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Test
+tests
+phpunit.xml
+
+# Documentation
+README.md
+WIZARD_REFACTOR_GUIDE.md
+
+# Development
+docker-compose.yml
+compose.yaml
+Dockerfile.dev

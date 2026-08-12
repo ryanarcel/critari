@@ -5,6 +5,11 @@ use App\Models\Demo;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
+// Health check endpoint for load balancers and Docker health checks
+Route::get('/health', function () {
+    return response()->json(['status' => 'ok'], 200);
+});
+
 // Route::get('/', function () {
 //     return Inertia::render('Welcome');
 // });

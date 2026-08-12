@@ -59,11 +59,21 @@ COPY --from=node-builder /app/public/build ./public/build
 # 5. Install PHP production dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
-# 6. Set appropriate permissions for Laravel storage & cache
+# 6. Copy Nginx configuration
+COPY nginx.conf /etc/nginx/sites-available/default
+RUN mkdir -p /etc/nginx/sites-enabled && \
+    ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+
+# 7. Copy Supervisor configuration and entrypoint script
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# 8. Set appropriate permissions for Laravel storage & cache
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# 7. Configure Production OPcache
+# 9. Configure Production OPcache
 RUN { \
     echo 'opcache.memory_consumption=128'; \
     echo 'opcache.interned_strings_buffer=8'; \
@@ -73,8 +83,19 @@ RUN { \
     echo 'opcache.enable_cli=1'; \
 } > /usr/local/etc/php/conf.d/opcache-recommended.ini
 
+# 10. Configure PHP-FPM to log to stdout
+RUN sed -i 's/;catch_workers_output = yes/catch_workers_output = yes/' /usr/local/etc/php-fpm.d/docker.conf && \
+    sed -i 's/;decorate_workers_output = no/decorate_workers_output = no/' /usr/local/etc/php-fpm.d/docker.conf
+
+# 11. Create supervisor log directory
+RUN mkdir -p /var/log/supervisor && chmod 755 /var/log/supervisor
+
 # Expose HTTP port
 EXPOSE 80
 
-# Start Supervisor to run PHP-FPM and Nginx simultaneously
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
+# Health check to verify container is running properly
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost/health || exit 1
+
+# Start application with entrypoint script
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
