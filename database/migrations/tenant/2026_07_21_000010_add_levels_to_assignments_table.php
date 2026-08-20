@@ -9,7 +9,7 @@ class AddLevelsToAssignmentsTable extends Migration
     public function up()
     {
         Schema::table('assignments', function (Blueprint $table) {
-            if (!Schema::hasColumn('assignments', 'levels')) {
+            if (! Schema::hasColumn('assignments', 'levels')) {
                 $table->json('levels')->nullable()->after('settings');
             }
         });
