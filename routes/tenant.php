@@ -4,10 +4,10 @@ use App\Http\Controllers\AssignmentController;
 use App\Http\Controllers\SubmissionController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
+use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
-Route::middleware(['web', InitializeTenancyBySubdomain::class, PreventAccessFromCentralDomains::class])
+Route::middleware(['web', InitializeTenancyByDomain::class, PreventAccessFromCentralDomains::class])
     ->group(function () {
         Route::get('/', fn () => Inertia::render('Welcome'))->name('home');
 
