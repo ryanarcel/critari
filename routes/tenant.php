@@ -7,10 +7,6 @@ use Inertia\Inertia;
 use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
-Route::get('/', function () {
-    return Inertia::render('Welcome');
-});
-
 Route::middleware(['web', InitializeTenancyBySubdomain::class, PreventAccessFromCentralDomains::class])
     ->group(function () {
         Route::get('/', fn () => Inertia::render('Welcome'))->name('home');
@@ -32,5 +28,4 @@ Route::middleware(['web', InitializeTenancyBySubdomain::class, PreventAccessFrom
             ->name('assignments.ai-rubric-suggestion');
         Route::post('/assignments/ai-levels-suggestion', [AssignmentController::class, 'getAILevelsSuggestion'])
             ->name('assignments.ai-levels-suggestion');
-
     });
