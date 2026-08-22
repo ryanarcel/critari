@@ -26,7 +26,8 @@ return [
     'central_domains' => [
         '127.0.0.1',
         'localhost',
-        env('APP_DOMAIN', 'critari.test'),
+        'critari.com',
+        env('APP_DOMAIN', 'critari.com'),
     ],
 
     /**
