@@ -13,6 +13,10 @@ class AddMaxScoreAndLevelsToAssignmentsTable extends Migration
             if (! Schema::hasColumn('assignments', 'max_score')) {
                 $table->unsignedInteger('max_score')->nullable()->after('description')->index();
             }
+            // Only add levels if it doesn't already exist
+            if (! Schema::hasColumn('assignments', 'levels')) {
+                $table->json('levels')->nullable()->after('max_score');
+            }
         });
     }
 
@@ -21,6 +25,9 @@ class AddMaxScoreAndLevelsToAssignmentsTable extends Migration
         Schema::table('assignments', function (Blueprint $table) {
             if (Schema::hasColumn('assignments', 'max_score')) {
                 $table->dropColumn('max_score');
+            }
+            if (Schema::hasColumn('assignments', 'levels')) {
+                $table->dropColumn('levels');
             }
         });
     }
