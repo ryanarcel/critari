@@ -35,16 +35,29 @@ class AssignmentController extends Controller
      */
     public function store(Request $request)
     {
+        // Log raw request for debugging
+        Log::info('Assignment store raw request: '.json_encode($request->all()));
+        error_log('Assignment store raw request: '.json_encode($request->all()));
+
         // Validate incoming data
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'question' => 'required|string',
-            'levels' => 'required|array|min:1',
-            'criteria' => 'required|array|min:1',
-            'session_id' => 'nullable|string|max:255',
-        ]);
+        try {
+            $validated = $request->validate([
+                'title' => 'required|string|max:255',
+                'question' => 'required|string',
+                'levels' => 'required|array|min:1',
+                'criteria' => 'required|array|min:1',
+                'session_id' => 'nullable|string|max:255',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $ve) {
+            Log::error('Assignment validation failed: '.json_encode($ve->errors()));
+            error_log('Assignment validation failed: '.json_encode($ve->errors()));
+            throw $ve;
+        }
 
         try {
+            // Log incoming validated payload for debugging
+            Log::info('Assignment store payload: '.json_encode($validated));
+            error_log('Assignment store payload: '.json_encode($validated));
             // Wrap database operations in a transaction
             $result = DB::transaction(function () use ($validated) {
                 // Calculate max score based on the highest level's range
@@ -98,6 +111,9 @@ class AssignmentController extends Controller
                 ];
             });
 
+            Log::info('Assignment store result: '.json_encode($result));
+            error_log('Assignment store result: '.json_encode($result));
+
             return response()->json([
                 'success' => true,
                 'message' => 'Assignment created successfully',
@@ -106,6 +122,9 @@ class AssignmentController extends Controller
 
         } catch (\Exception $e) {
             Log::error('Assignment Store Failure: '.$e->getMessage());
+            Log::error('Stack trace: '.$e->getTraceAsString());
+            error_log('Assignment Store Failure: '.$e->getMessage());
+            error_log('Stack trace: '.$e->getTraceAsString());
 
             return response()->json([
                 'success' => false,

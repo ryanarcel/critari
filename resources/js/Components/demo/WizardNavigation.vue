@@ -12,14 +12,14 @@
 		<div v-else></div>
 
 		<div class="flex items-center gap-3">
-			<!-- Step 3: Show only Next Step since rubric is published -->
+			<!-- Step 3: Show Publish button to save and advance -->
 			<button 
 				v-if="wizard.currentStep === 3"
 				type="button"
 				class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition shadow" 
-				@click.prevent="wizard.nextStep"
+				@click.prevent="publishAndProceed"
 			>
-				<span>Next Step</span>
+				<span>Publish & Continue</span>
 				<ArrowRightIcon class="w-4 h-4" />
 			</button>
 			<!-- Step 4: Show Submit Answer if assessment not done, Next Step if done -->
@@ -87,8 +87,11 @@ const submitStudentAnswer = async () => {
 	
 	try {
 		// Step 1: Save student submission
+		const assignmentId = typeof wizard.assignment_id === 'number' ? wizard.assignment_id : (wizard.assignment_id?.value ?? null);
+		console.debug('Submitting student answer; assignment_id resolved as:', assignmentId, 'wizard.assignment_id raw:', wizard.assignment_id);
+
 		const submissionRes = await axios.post('/submissions', {
-			assignment_id: wizard.assignment_id,
+			assignment_id: assignmentId,
 			student_response: wizard.studentAnswer,
 			demo_id: wizard.demo_id,
 		});
