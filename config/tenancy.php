@@ -26,9 +26,8 @@ return [
     'central_domains' => [
         '127.0.0.1',
         'localhost',
+        env('CENTRAL_DOMAIN', 'critari.com'),
         'critari.com',
-        env('APP_DOMAIN', 'critari.com'),
-        'critari-production-38ai8e.laravel.cloud',
     ],
 
     /**
