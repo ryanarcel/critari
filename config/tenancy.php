@@ -28,6 +28,7 @@ return [
         'localhost',
         'critari.com',
         env('APP_DOMAIN', 'critari.com'),
+        'critari-production-38ai8e.laravel.cloud'
     ],
 
     /**
