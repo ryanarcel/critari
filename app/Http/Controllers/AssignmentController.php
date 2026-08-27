@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use OpenAI\Laravel\Facades\OpenAI;
 
 class AssignmentController extends Controller
@@ -48,7 +49,7 @@ class AssignmentController extends Controller
                 'criteria' => 'required|array|min:1',
                 'session_id' => 'nullable|string|max:255',
             ]);
-        } catch (\Illuminate\Validation\ValidationException $ve) {
+        } catch (ValidationException $ve) {
             Log::error('Assignment validation failed: '.json_encode($ve->errors()));
             error_log('Assignment validation failed: '.json_encode($ve->errors()));
             throw $ve;
