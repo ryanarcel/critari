@@ -23,11 +23,11 @@ return [
      *
      * Only relevant if you're using the domain or subdomain identification middleware.
      */
-    'central_domains' => [
+    'central_domains' => in_array(config('app.env'), ['production', 'staging']) ? [
+        env('CENTRAL_DOMAIN', 'critari.com'),
+    ] : [
         '127.0.0.1',
         'localhost',
-        env('CENTRAL_DOMAIN', 'critari.com'),
-        'critari.com',
     ],
 
     /**
