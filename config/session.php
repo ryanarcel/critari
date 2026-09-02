@@ -158,7 +158,7 @@ return [
 
     // Use a sensible default for local development so cookies are shared
     // across subdomains (e.g. app.localhost and tenant.localhost).
-    'domain' => env('SESSION_DOMAIN', '.localhost'),
+    'domain' => env('SESSION_DOMAIN'),
 
     /*
     |--------------------------------------------------------------------------
