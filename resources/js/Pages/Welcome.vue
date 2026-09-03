@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
+import LoginModal from '@/Components/Auth/LoginModal.vue';
 
 const page = usePage();
 const user = computed(() => (page.props.auth as { user: { name: string } | null })?.user ?? null);
+const showLoginModal = ref(false);
 
 const generateSessionId = () => {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -57,12 +59,12 @@ const generateSessionId = () => {
                         </Link>
                     </template>
                     <template v-else>
-                        <Link
-                            :href="route('login')"
+                        <button
                             class="text-xs font-bold uppercase tracking-wider text-indigo-100 transition-colors hover:text-white"
+                            @click="showLoginModal = true"
                         >
                             Sign In
-                        </Link>
+                        </button>
                         <Link
                             :href="route('register')"
                             class="rounded-lg border border-indigo-400 bg-indigo-700 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-indigo-800"
@@ -122,5 +124,8 @@ const generateSessionId = () => {
                 </a>
             </div>
         </header>
+
+        <!-- Login Modal -->
+        <LoginModal v-if="showLoginModal" @close="showLoginModal = false" />
     </div>
 </template>
