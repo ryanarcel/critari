@@ -40,15 +40,6 @@ const generateSessionId = () => {
                     critari<span class="text-indigo-200">.</span>
                 </span>
 
-                <div
-                    class="hidden items-center space-x-8 text-xs font-semibold uppercase tracking-wider text-indigo-100 md:flex"
-                >
-                    <a href="#pipeline" class="transition-colors hover:text-white">Pipeline</a>
-                    <a href="#isolation" class="transition-colors hover:text-white"
-                        >Data Security</a
-                    >
-                </div>
-
                 <div class="flex items-center space-x-4">
                     <template v-if="user">
                         <Link
@@ -59,18 +50,9 @@ const generateSessionId = () => {
                         </Link>
                     </template>
                     <template v-else>
-                        <button
-                            class="text-xs font-bold uppercase tracking-wider text-indigo-100 transition-colors hover:text-white"
-                            @click="showLoginModal = true"
-                        >
-                            Sign In
-                        </button>
-                        <Link
-                            :href="route('register')"
-                            class="rounded-lg border border-indigo-400 bg-indigo-700 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-indigo-800"
-                        >
-                            Get Started
-                        </Link>
+                        <span class="text-xs font-semibold uppercase tracking-wider text-indigo-300">
+                            🚀 Coming Soon
+                        </span>
                     </template>
                 </div>
             </div>
@@ -116,7 +98,7 @@ const generateSessionId = () => {
                     Try the demo
                 </Link>
                 <a
-                    href="https://github.com"
+                    href="https://github.com/ryanarcel/critari"
                     target="_blank"
                     class="w-full rounded-xl border border-slate-800/80 bg-slate-900 px-8 py-4 text-center text-sm font-bold tracking-wide text-slate-300 transition-all hover:bg-slate-800/80 sm:w-auto"
                 >
@@ -124,6 +106,20 @@ const generateSessionId = () => {
                 </a>
             </div>
         </header>
+
+        <!-- Footnote -->
+        <footer class="relative z-10 mx-auto max-w-6xl px-6 py-12 text-center">
+            <p class="text-sm text-slate-400">
+                <span class="font-semibold text-slate-300">Note:</span> This website is still in progress. However, you can
+                <Link
+                    :href="route('demos.session', { sessionId: generateSessionId() })"
+                    class="font-semibold text-indigo-400 underline transition-colors hover:text-indigo-300"
+                >
+                    try the interactive demo
+                </Link>
+                to see Critari in action!
+            </p>
+        </footer>
 
         <!-- Login Modal -->
         <LoginModal v-if="showLoginModal" @close="showLoginModal = false" />

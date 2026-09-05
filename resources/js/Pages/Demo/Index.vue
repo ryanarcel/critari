@@ -164,15 +164,6 @@ const getAIRubricSuggestion = () => {
                     critari<span class="text-indigo-200">.</span>
                 </Link>
 
-                <div
-                    class="hidden items-center space-x-8 text-xs font-semibold uppercase tracking-wider text-indigo-100 md:flex"
-                >
-                    <a href="#pipeline" class="transition-colors hover:text-white">Pipeline</a>
-                    <a href="#isolation" class="transition-colors hover:text-white"
-                        >Data Security</a
-                    >
-                </div>
-
                 <div class="flex items-center space-x-4">
                     <template v-if="user">
                         <Link
@@ -183,18 +174,9 @@ const getAIRubricSuggestion = () => {
                         </Link>
                     </template>
                     <template v-else>
-                        <Link
-                            :href="route('login')"
-                            class="text-xs font-bold uppercase tracking-wider text-indigo-100 transition-colors hover:text-white"
-                        >
-                            Sign In
-                        </Link>
-                        <Link
-                            :href="route('register')"
-                            class="rounded-lg border border-indigo-400 bg-indigo-700 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-indigo-800"
-                        >
-                            Get Started
-                        </Link>
+                        <span class="text-xs font-semibold uppercase tracking-wider text-indigo-300">
+                            🚀 Coming Soon
+                        </span>
                     </template>
                 </div>
             </div>

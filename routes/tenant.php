@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AssignmentController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SubmissionController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -18,6 +19,10 @@ Route::middleware(['web', InitializeTenancyBySubdomain::class, PreventAccessFrom
         Route::get('/demos/{sessionId}', function ($sessionId) {
             return Inertia::render('Demo/Index', ['sessionId' => $sessionId]);
         })->name('demos.session');
+
+        // Route::middleware(['auth', 'verified'])->group(function () {
+            Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        // });
 
         Route::resource('assignments', AssignmentController::class);
         Route::resource('submissions', SubmissionController::class);

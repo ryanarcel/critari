@@ -12,17 +12,20 @@ class Assignment extends Model
         'demo_id',
         'title',
         'description',
-        // keep `question` available at the model layer (maps to `description` column)
         'question',
         'levels',
         'max_score',
+        'created_by',
+        'due_at',
     ];
 
     protected $casts = [
         'id' => 'integer',
         'demo_id' => 'integer',
+        'created_by' => 'integer',
         'max_score' => 'integer',
         'levels' => 'array',
+        'due_at' => 'datetime',
     ];
 
     public function demo()

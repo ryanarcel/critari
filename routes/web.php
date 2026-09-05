@@ -1,28 +1,17 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
-use App\Models\Demo;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 // Health check endpoint for load balancers and Docker health checks
 Route::get('/health', function () {
     return response()->json(['status' => 'ok'], 200);
 });
 
-// Route::get('/', function () {
-//     return Inertia::render('Welcome');
-// });
-
-Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
-
-// Route::middleware('auth')->group(function () {
-Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-// Demo and related API routes removed (controllers deleted)
-// });
+Route::middleware('auth')->group(function () {
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+});
 
 require __DIR__.'/auth.php';
