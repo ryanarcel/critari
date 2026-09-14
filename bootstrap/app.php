@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Session\Middleware\StartSession;
 use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
@@ -13,14 +14,17 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // 1. Trust proxies for Laravel Cloud + Cloudflare
         $middleware->trustProxies(at: '*');
 
-        // 2. Set explicit middleware priority
-        $middleware->priority([
-            PreventAccessFromCentralDomains::class,
+        $middleware->prependToPriorityList(
+            StartSession::class,
             InitializeTenancyBySubdomain::class,
-        ]);
+        );
+
+        $middleware->appendToPriorityList(
+            InitializeTenancyBySubdomain::class,
+            PreventAccessFromCentralDomains::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

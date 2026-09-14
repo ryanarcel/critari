@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\AssignmentController;
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\SocialiteController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SubmissionController;
 use Illuminate\Support\Facades\Route;
@@ -8,8 +10,11 @@ use Inertia\Inertia;
 use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
-Route::middleware(['web', InitializeTenancyBySubdomain::class, PreventAccessFromCentralDomains::class])
+Route::middleware([InitializeTenancyBySubdomain::class, PreventAccessFromCentralDomains::class, 'web'])
     ->group(function () {
+        // OAuth verification endpoint (no auth required)
+        Route::get('/auth/oauth/verify', [SocialiteController::class, 'verify'])->name('auth.oauth.verify');
+
         Route::get('/', fn () => Inertia::render('Welcome'))->name('home');
 
         Route::get('/demos', function () {
@@ -20,10 +25,6 @@ Route::middleware(['web', InitializeTenancyBySubdomain::class, PreventAccessFrom
             return Inertia::render('Demo/Index', ['sessionId' => $sessionId]);
         })->name('demos.session');
 
-        // Route::middleware(['auth', 'verified'])->group(function () {
-            Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-        // });
-
         Route::resource('assignments', AssignmentController::class);
         Route::resource('submissions', SubmissionController::class);
         Route::post('/submissions/{submission}/assess', [SubmissionController::class, 'processAIAssessment'])
@@ -33,4 +34,12 @@ Route::middleware(['web', InitializeTenancyBySubdomain::class, PreventAccessFrom
             ->name('assignments.ai-rubric-suggestion');
         Route::post('/assignments/ai-levels-suggestion', [AssignmentController::class, 'getAILevelsSuggestion'])
             ->name('assignments.ai-levels-suggestion');
+
+        // Dashboard requires authentication
+        Route::middleware(['auth'])->group(function () {
+            Route::post('/tenant/logout', [AuthenticatedSessionController::class, 'destroy'])
+                ->name('tenant.logout');
+
+            Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        });
     });

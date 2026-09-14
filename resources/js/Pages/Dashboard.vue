@@ -57,7 +57,7 @@ const getStatusColor = (status: string) => {
 };
 
 const handleLogout = () => {
-    router.post(route('logout'));
+    router.post(route('tenant.logout'));
 };
 </script>
 

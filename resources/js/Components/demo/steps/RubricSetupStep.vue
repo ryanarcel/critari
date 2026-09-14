@@ -11,7 +11,7 @@
                         <input
                             id="title"
                             v-model="wizard.title"
-                            placeholder="e.g. Narrative Essay - Midterm 2026"
+                            placeholder="e.g. An essay on the Trojan War - Midterm 2026"
                             class="block w-full rounded-lg border border-slate-200 bg-slate-50 shadow-sm sm:text-sm p-4 pr-10 text-slate-700 transition-colors duration-150 hover:border-slate-300 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
                         />
                         <div
@@ -22,7 +22,7 @@
                     </div>
                     <p class="mt-2 text-xs text-slate-500">
                         Give your rubric a descriptive title that clearly identifies the assignment.
-                        (e.g., Narrative Essay, Evidence-based Essay)
+                        (e.g., An essay on the Trojan War, Evidence-based Essay)
                     </p>
                 </div>
             </div>

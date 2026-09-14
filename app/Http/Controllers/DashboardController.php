@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Assignment;
 use App\Models\Submission;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -12,8 +13,21 @@ class DashboardController extends Controller
 {
     public function index(): Response
     {
+        Log::info('Dashboard - request received', [
+            'session_id' => session()->getId(),
+            'auth_check' => Auth::check(),
+            'auth_id' => Auth::id(),
+            'session_data_keys' => array_keys(session()->all()),
+        ]);
+
         $user = Auth::user();
-        
+
+        if (! $user) {
+            Log::warning('Dashboard accessed without authenticated user');
+
+            return redirect()->route('login');
+        }
+
         // Get assignments created by this user (or where user has access)
         $assignments = Assignment::query()
             ->where('created_by', $user->id)

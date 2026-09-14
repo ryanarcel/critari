@@ -71,7 +71,7 @@ const showingNavigationDropdown = ref(false);
                                             Profile
                                         </DropdownLink>
                                         <DropdownLink
-                                            :href="route('logout')"
+                                            :href="route('tenant.logout')"
                                             method="post"
                                             as="button"
                                         >
@@ -152,7 +152,7 @@ const showingNavigationDropdown = ref(false);
                             <ResponsiveNavLink :href="route('profile.edit')">
                                 Profile
                             </ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('logout')" method="post" as="button">
+                            <ResponsiveNavLink :href="route('tenant.logout')" method="post" as="button">
                                 Log Out
                             </ResponsiveNavLink>
                         </div>

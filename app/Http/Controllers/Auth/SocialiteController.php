@@ -4,103 +4,67 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\OAuthState;
+use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
+use Stancl\Tenancy\Facades\Tenancy;
 
 class SocialiteController extends Controller
 {
     /**
      * Redirect to Google OAuth
-     * Store the tenant host in database keyed by Socialite's state parameter
+     * Store tenant mapping in database with a custom state token
      */
     public function redirect(): RedirectResponse
     {
         $tenantHost = request()->getHost();
+        $stateToken = Str::random(40);
 
-        Log::info('OAuth redirect initiated', [
+        OAuthState::create([
+            'token' => $stateToken,
             'tenant_host' => $tenantHost,
-            'full_url' => request()->url(),
+            'expires_at' => now()->addHours(1),
         ]);
 
-        // Socialite will generate a state parameter and pass it to Google
-        // We'll intercept it and store the tenant host for later retrieval
-        // Get the Socialite provider
-        $provider = Socialite::driver('google');
-
-        // Build the redirect URL manually to capture the state
-        $redirectUrl = $provider->redirect()->getTargetUrl();
-
-        // Extract the state parameter from the redirect URL
-        $urlParts = parse_url($redirectUrl);
-        parse_str($urlParts['query'], $queryParams);
-        $state = $queryParams['state'] ?? null;
-
-        if ($state) {
-            Log::info('Captured Socialite state', ['state' => $state]);
-
-            // Store the tenant host keyed by this state
-            OAuthState::create([
-                'token' => $state,
-                'tenant_host' => $tenantHost,
-                'expires_at' => now()->addMinutes(10),
-            ]);
-
-            Log::info('Stored tenant in database with state', [
-                'state' => $state,
-                'tenant_host' => $tenantHost,
-            ]);
-        }
-
-        // Return the original redirect
-        return redirect()->away($redirectUrl);
+        return Socialite::driver('google')
+            ->with(['state' => $stateToken])
+            ->redirect();
     }
 
     /**
      * Handle Google OAuth callback
-     * Retrieve tenant host from database using Socialite's state parameter
+     * Look up tenant from OAuthState using the state parameter
+     * Initialize tenant context before creating user
+     * Use temporary token to pass auth across domain boundary
      */
     public function callback()
     {
-        $state = request()->get('state');
-
-        Log::info('OAuth callback received', [
-            'request_host' => request()->getHost(),
-            'state' => $state,
-        ]);
-
         try {
-            // Default to current host
-            $tenantHost = request()->getHost();
+            $state = request()->query('state');
+            $oauthState = OAuthState::where('token', $state)->first();
 
-            // Look up the tenant host using the state parameter
-            if ($state) {
-                $oauthState = OAuthState::where('token', $state)->first();
-
-                if ($oauthState) {
-                    $tenantHost = $oauthState->tenant_host;
-                    Log::info('Retrieved tenant from database', [
-                        'state' => $state,
-                        'tenant_host' => $tenantHost,
-                    ]);
-
-                    // Clean up
-                    $oauthState->delete();
-                } else {
-                    Log::warning('OAuth state not found in database', ['state' => $state]);
-                }
-            } else {
-                Log::warning('No state parameter received from Google');
+            if (! $oauthState) {
+                throw new \Exception('Invalid OAuth state - tenant mapping not found');
             }
 
-            $googleUser = Socialite::driver('google')->user();
+            $tenantHost = $oauthState->tenant_host;
+            $oauthState->delete();
 
-            Log::info('Google user authenticated', [
-                'email' => $googleUser->getEmail(),
-                'name' => $googleUser->getName(),
-            ]);
+            $subdomain = explode('.', $tenantHost)[0];
+            $tenant = Tenant::whereHas('domains', function ($query) use ($subdomain) {
+                $query->where('domain', $subdomain);
+            })->first();
+
+            if ($tenant) {
+                Tenancy::initialize($tenant);
+            }
+
+            $googleUser = Socialite::driver('google')->stateless()->user();
 
             $user = User::updateOrCreate(
                 ['email' => $googleUser->getEmail()],
@@ -111,36 +75,104 @@ class SocialiteController extends Controller
                 ]
             );
 
-            Log::info('User created or updated', [
+            Log::info('OAuth callback - user created/updated', [
                 'user_id' => $user->id,
-                'email' => $user->email,
+                'user_email' => $user->email,
+                'tenant_id' => $tenant?->id,
             ]);
 
-            Auth::login($user, remember: true);
-
-            Log::info('User logged in', [
-                'user_id' => Auth::id(),
+            // Generate temporary token (5 minutes expiry) to pass auth data across domain boundary
+            // Store in landlord database (bypasses Tenancy wrapper)
+            $token = Str::random(40);
+            DB::connection('landlord')->table('o_auth_states')->insert([
+                'token' => $token,
+                'tenant_host' => json_encode(['user_id' => $user->id, 'tenant_id' => $tenant?->id]),
+                'expires_at' => now()->addMinutes(5),
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
 
-            // Build the protocol (http/https)
             $protocol = request()->secure() ? 'https' : 'http';
-            $dashboardUrl = "{$protocol}://{$tenantHost}/dashboard";
+            $dashboardUrl = "{$protocol}://{$tenantHost}/auth/oauth/verify?token={$token}";
 
-            Log::info('Constructed dashboard URL', [
-                'protocol' => $protocol,
-                'tenant_host' => $tenantHost,
+            Log::info('OAuth callback - redirecting to verify endpoint', [
                 'dashboard_url' => $dashboardUrl,
+                'token' => $token,
             ]);
 
             return redirect($dashboardUrl);
         } catch (\Exception $e) {
-            Log::error('OAuth callback failed', [
-                'exception' => get_class($e),
+            Log::error('OAuth callback error', [
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return redirect()->route('login')->withErrors(['google' => 'Failed to authenticate with Google']);
+        }
+    }
+
+    /**
+     * Verify OAuth token and establish session on subdomain
+     */
+    public function verify()
+    {
+        try {
+            $token = request()->query('token');
+            $record = DB::connection('landlord')
+                ->table('o_auth_states')
+                ->where('token', $token)
+                ->first();
+
+            if (! $record || now()->isAfter($record->expires_at)) {
+                throw new \Exception('Invalid or expired OAuth token');
+            }
+
+            // Parse the stored data
+            $data = json_decode($record->tenant_host, true);
+            $userId = $data['user_id'] ?? null;
+
+            if (! $userId) {
+                throw new \Exception('Invalid token data');
+            }
+
+            // Delete the token (one-time use)
+            DB::connection('landlord')
+                ->table('o_auth_states')
+                ->where('token', $token)
+                ->delete();
+
+            $user = User::find($userId);
+            if (! $user) {
+                throw new \Exception('User not found');
+            }
+
+            Log::info('OAuth verify - logging in user', [
+                'user_id' => $user->id,
+                'token' => $token,
+            ]);
+
+            // Create session on subdomain (app.localhost)
+            Auth::login($user, remember: true);
+
+            // Explicitly save session before creating response
+            session()->save();
+
+            $sessionId = session()->getId();
+
+            Log::info('OAuth verify - session created', [
+                'auth_check' => Auth::check(),
+                'auth_id' => Auth::id(),
+                'session_id' => $sessionId,
+                'session_in_db' => DB::connection('landlord')->table('sessions')->where('id', $sessionId)->exists(),
+            ]);
+
+            return redirect()->route('dashboard');
+        } catch (\Exception $e) {
+            Log::error('OAuth verify error', [
+                'message' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('login')->withErrors(['oauth' => 'Authentication failed']);
         }
     }
 }

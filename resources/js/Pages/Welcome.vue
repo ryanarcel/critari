@@ -50,9 +50,18 @@ const generateSessionId = () => {
                         </Link>
                     </template>
                     <template v-else>
-                        <span class="text-xs font-semibold uppercase tracking-wider text-indigo-300">
-                            🚀 Coming Soon
-                        </span>
+                        <button
+                            class="text-xs font-bold uppercase tracking-wider text-indigo-100 transition-colors hover:text-white"
+                            @click="showLoginModal = true"
+                        >
+                            Sign In
+                        </button>
+                        <Link
+                            :href="route('register')"
+                            class="rounded-lg border border-indigo-400 bg-indigo-700 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-indigo-800"
+                        >
+                            Get Started
+                        </Link>
                     </template>
                 </div>
             </div>
