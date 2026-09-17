@@ -13,10 +13,25 @@ export interface CriterionCell {
     cells: string[];
 }
 
+export type WizardMode = 'demo' | 'assignment';
+
+export interface WizardStep {
+    id: number;
+    name: string;
+    description: string;
+    section: 'Teacher' | 'Student' | 'Assessment';
+}
+
+export interface AssignmentQuestion {
+    id: string;
+    prompt: string;
+}
+
 export interface WizardState {
     currentStep: number;
     title: string;
     question: string;
+    questions?: AssignmentQuestion[];
     studentAnswer: string;
     levels: Level[];
     criteria: CriterionCell[];
@@ -43,10 +58,11 @@ export const useWizardStore = defineStore('wizard', () => {
     const assessmentComplete = ref(false);
 
     // Wizard state
+    const mode = ref<WizardMode>('demo');
     const currentStep = ref(1);
-    const totalSteps = 5;
+    const isSaving = ref(false);
 
-    const steps = [
+    const demoSteps: WizardStep[] = [
         {
             id: 1,
             name: 'Rubric Setup',
@@ -56,7 +72,7 @@ export const useWizardStore = defineStore('wizard', () => {
         {
             id: 2,
             name: 'Question Prompt',
-            description: 'Enter the assignment question',
+            description: 'Enter one or more assignment questions',
             section: 'Teacher',
         },
         {
@@ -79,6 +95,35 @@ export const useWizardStore = defineStore('wizard', () => {
         },
     ];
 
+    const assignmentSteps: WizardStep[] = [
+        {
+            id: 1,
+            name: 'Rubric Setup',
+            description: 'Create title and rubric matrix',
+            section: 'Teacher',
+        },
+        {
+            id: 2,
+            name: 'Question Prompt',
+            description: 'Enter one or more assignment questions',
+            section: 'Teacher',
+        },
+        {
+            id: 3,
+            name: 'Review & Create',
+            description: 'Confirm your rubric and create the assignment',
+            section: 'Teacher',
+        },
+    ];
+
+    const steps = computed(() => (mode.value === 'assignment' ? assignmentSteps : demoSteps));
+    const totalSteps = computed(() => steps.value.length);
+
+    const setMode = (newMode: WizardMode) => {
+        mode.value = newMode;
+        currentStep.value = 1;
+    };
+
     // Modal state
     const isModalOpen = ref(false);
     const modalTitle = ref('');
@@ -87,7 +132,13 @@ export const useWizardStore = defineStore('wizard', () => {
 
     // Rubric editor state
     const title = ref('');
-    const question = ref('');
+    const questions = ref<AssignmentQuestion[]>([{ id: 'q-0', prompt: '' }]);
+    const question = computed(() =>
+        questions.value
+            .map((item) => item.prompt.trim())
+            .filter(Boolean)
+            .join('\n\n'),
+    );
     const levels = ref<Level[]>([
         { id: 'lvl-0', name: 'Needs Imp.', range: '0-4' },
         { id: 'lvl-1', name: 'Satisfactory', range: '5-6' },
@@ -201,6 +252,21 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
         for (const c of criteria.value) c.cells.splice(idx, 1);
     };
 
+    const addQuestion = () => {
+        questions.value.push({
+            id: `q-${Date.now()}`,
+            prompt: '',
+        });
+    };
+
+    const deleteQuestion = (idx: number) => {
+        if (questions.value.length <= 1) {
+            return;
+        }
+
+        questions.value.splice(idx, 1);
+    };
+
     // Validation methods
     const validateStep = (step: number): boolean => {
         if (step === 1) {
@@ -239,14 +305,26 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
             }
             return true;
         } else if (step === 2) {
-            if (!question.value.trim()) {
+            if (questions.value.length === 0) {
                 showModal(
                     'Missing Question',
-                    'Please enter an assignment question or prompt.',
+                    'Please add at least one assignment question or prompt.',
                     'error',
                 );
                 return false;
             }
+
+            for (let i = 0; i < questions.value.length; i++) {
+                if (!questions.value[i].prompt.trim()) {
+                    showModal(
+                        'Incomplete Question',
+                        `Question ${i + 1}: Please enter a question or prompt.`,
+                        'error',
+                    );
+                    return false;
+                }
+            }
+
             return true;
         } else if (step === 4) {
             if (!studentAnswer.value.trim()) {
@@ -261,7 +339,7 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
     // Navigation methods
     const nextStep = () => {
         if (validateStep(currentStep.value)) {
-            if (currentStep.value < totalSteps) {
+            if (currentStep.value < totalSteps.value) {
                 currentStep.value++;
             }
         }
@@ -284,7 +362,7 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
     // Reset form
     const resetForm = () => {
         title.value = '';
-        question.value = '';
+        questions.value = [{ id: 'q-0', prompt: '' }];
         studentAnswer.value = '';
         levels.value = [
             { id: 'lvl-0', name: 'Needs Imp.', range: '0-4' },
@@ -332,7 +410,7 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
         currentStep.value = 1;
     };
 
-    const currentStepData = computed(() => steps[currentStep.value - 1]);
+    const currentStepData = computed(() => steps.value[currentStep.value - 1]);
 
     // Set assessment results from AI grading
     const setAssessmentResults = (
@@ -370,6 +448,7 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
             currentStep: currentStep.value,
             title: title.value,
             question: question.value,
+            questions: questions.value,
             studentAnswer: studentAnswer.value,
             levels: levels.value,
             criteria: criteria.value,
@@ -398,7 +477,16 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
                 const state = JSON.parse(saved) as WizardState;
                 currentStep.value = state.currentStep;
                 title.value = state.title;
-                question.value = state.question;
+                if (Array.isArray(state.questions) && state.questions.length > 0) {
+                    questions.value = state.questions;
+                } else {
+                    questions.value = [
+                        {
+                            id: 'q-0',
+                            prompt: state.question || '',
+                        },
+                    ];
+                }
                 studentAnswer.value = state.studentAnswer;
                 levels.value = state.levels;
                 criteria.value = state.criteria;
@@ -420,7 +508,7 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
         () => [
             currentStep.value,
             title.value,
-            question.value,
+            questions.value,
             studentAnswer.value,
             levels.value,
             criteria.value,
@@ -434,9 +522,11 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
     return {
         // State
         sessionId,
+        mode,
         currentStep,
         totalSteps,
         steps,
+        isSaving,
         isModalOpen,
         modalTitle,
         maxScore,
@@ -444,6 +534,7 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
         modalType,
         title,
         question,
+        questions,
         levels,
         criteria,
         studentAnswer,
@@ -464,10 +555,13 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
         addLevel,
         deleteCriteria,
         deleteLevel,
+        addQuestion,
+        deleteQuestion,
         validateStep,
         nextStep,
         prevStep,
         goToStep,
+        setMode,
         resetForm,
         setAssessmentResults,
         saveState,

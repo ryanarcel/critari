@@ -25,7 +25,10 @@ Route::middleware([InitializeTenancyBySubdomain::class, PreventAccessFromCentral
             return Inertia::render('Demo/Index', ['sessionId' => $sessionId]);
         })->name('demos.session');
 
-        Route::resource('assignments', AssignmentController::class);
+        Route::get('/assignments/create', [AssignmentController::class, 'create'])
+            ->middleware('auth')
+            ->name('assignments.create');
+        Route::resource('assignments', AssignmentController::class)->except(['create']);
         Route::resource('submissions', SubmissionController::class);
         Route::post('/submissions/{submission}/assess', [SubmissionController::class, 'processAIAssessment'])
             ->name('submissions.assess');

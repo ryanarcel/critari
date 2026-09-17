@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Assignment;
 use App\Models\CriterionScore;
 use App\Models\Submission;
 use Illuminate\Http\JsonResponse;
@@ -16,25 +15,18 @@ class SubmissionController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
-    {
-        //
-    }
+    public function index() {}
 
     /**
      * Show the form for creating a new resource.
      */
-    public function create()
-    {
-        //
-    }
+    public function create() {}
 
     /**
      * Store a newly created resource in storage.
      */
     public function store(Request $request): JsonResponse
     {
-        // Validate incoming data
         $validated = $request->validate([
             'assignment_id' => 'required|integer|exists:assignments,id',
             'student_response' => 'required|string',
@@ -42,7 +34,6 @@ class SubmissionController extends Controller
         ]);
 
         try {
-            // Create submission record
             $submission = Submission::create([
                 'assignment_id' => $validated['assignment_id'],
                 'user_id' => auth()->id() ?? null,
@@ -72,19 +63,13 @@ class SubmissionController extends Controller
      */
     public function show(Submission $submission)
     {
-        // Optionally authorize user can view this submission
-        // $this->authorize('view', $submission);
-
         return response()->json($submission);
     }
 
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Submission $submission)
-    {
-        //
-    }
+    public function edit(Submission $submission) {}
 
     /**
      * Update the specified resource in storage.
@@ -116,10 +101,7 @@ class SubmissionController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Submission $submission)
-    {
-        //
-    }
+    public function destroy(Submission $submission) {}
 
     /**
      * Process AI assessment for a submission.
@@ -132,9 +114,8 @@ class SubmissionController extends Controller
         ]);
 
         try {
-            // Load submission with assignment and criteria
             $submission = Submission::findOrFail($validated['submission_id']);
-            $assignment = $submission->assignment()->with('criteria')->firstOrFail();
+            $assignment = $submission->assignment()->with(['criteria', 'questions'])->firstOrFail();
             $studentResponse = $submission->payload['student_response'] ?? '';
 
             if (empty($studentResponse)) {
@@ -151,19 +132,15 @@ class SubmissionController extends Controller
                 ], 400);
             }
 
-            // Format criteria info for the prompt
             $criteriaList = $assignment->criteria
                 ->map(fn ($c) => "- {$c->name}")
                 ->implode("\n");
 
-            // Format levels for scoring context
-            // $assignment->levels is already an array due to model casting
             $levels = is_array($assignment->levels) ? $assignment->levels : json_decode($assignment->levels, true);
             $levelsFormatted = collect($levels)
                 ->map(fn ($lvl) => "{$lvl['name']}: {$lvl['range']} pts")
                 ->implode(', ');
 
-            // Calculate max score per criterion from the highest level's range
             $maxLevel = end($levels);
             $rangeString = $maxLevel['range'] ?? '0-0';
             $rangeParts = explode('-', $rangeString);
@@ -172,7 +149,7 @@ class SubmissionController extends Controller
             $prompt = "You are an expert academic assessor. Grade the following student response against the provided criteria.
 
                     ASSIGNMENT:
-                    {$assignment->description}
+                    {$assignment->formattedPrompts()}
 
                     GRADING LEVELS:
                     {$levelsFormatted}
@@ -215,10 +192,8 @@ class SubmissionController extends Controller
                 throw new \Exception('Invalid JSON returned from AI assessment.');
             }
 
-            // Store scores in a database transaction
             return DB::transaction(function () use ($submission, $assignment, $data) {
                 foreach ($data['scores'] as $scoreData) {
-                    // Find criterion by name
                     $criterion = $assignment->criteria()
                         ->where('name', $scoreData['criterion_name'])
                         ->first();
@@ -233,7 +208,6 @@ class SubmissionController extends Controller
                     }
                 }
 
-                // Update submission status
                 $totalScore = collect($data['scores'])->sum('score');
                 $submission->update([
                     'score' => $totalScore,

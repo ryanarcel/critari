@@ -28,31 +28,27 @@ class DashboardController extends Controller
             return redirect()->route('login');
         }
 
-        // Get assignments created by this user (or where user has access)
         $assignments = Assignment::query()
+            ->with('questions')
             ->where('created_by', $user->id)
-            ->orWhereNull('created_by') // Include assignments without explicit creator (legacy)
+            ->whereNull('demo_id')
             ->orderByDesc('created_at')
             ->get();
 
-        // Calculate statistics
         $totalPapersGraded = Submission::whereIn('assignment_id', $assignments->pluck('id'))
             ->where('status', 'graded')
             ->count();
 
         $activeAssignmentsCount = $assignments->count();
 
-        // Estimate time saved: ~3 min per paper graded (average rubric grading time)
         $minutesSaved = $totalPapersGraded * 3;
         $hoursSaved = round($minutesSaved / 60, 1);
 
-        // Get assignment details with submission counts
         $assignmentsList = $assignments->map(function ($assignment) {
             $submissions = Submission::where('assignment_id', $assignment->id)->get();
             $gradedCount = $submissions->where('status', 'graded')->count();
             $totalCount = $submissions->count();
 
-            // Determine status
             if ($totalCount === 0) {
                 $status = 'Draft';
             } elseif ($gradedCount === 0) {
@@ -66,7 +62,7 @@ class DashboardController extends Controller
             return [
                 'id' => $assignment->id,
                 'title' => $assignment->title,
-                'class' => 'Eng 101 - P2', // TODO: Link to actual class/period
+                'class' => null,
                 'submissions_completed' => $gradedCount,
                 'submissions_total' => $totalCount,
                 'status' => $status,
@@ -74,20 +70,19 @@ class DashboardController extends Controller
             ];
         })->values();
 
-        // Get recently saved rubrics (using assignments as rubric templates)
         $recentRubrics = $assignments->take(3)->map(function ($assignment) {
             return [
                 'id' => $assignment->id,
                 'name' => $assignment->title,
-                'description' => $assignment->description,
+                'description' => $assignment->formattedPrompts(),
             ];
         })->values();
 
         return Inertia::render('Dashboard', [
             'user' => [
                 'name' => $user->name,
-                'school' => 'Lincoln High School', // TODO: Get from user/tenant profile
-                'department' => 'English Department', // TODO: Get from user profile
+                'school' => 'Lincoln High School',
+                'department' => 'English Department',
                 'avatar' => $user->name[0] ?? 'A',
             ],
             'stats' => [

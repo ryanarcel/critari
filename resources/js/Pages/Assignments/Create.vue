@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { useWizardStore } from '@/stores/demo/wizardStore';
 import WizardSidebar from '@/Components/demo/WizardSidebar.vue';
 import WizardModal from '@/Components/demo/WizardModal.vue';
@@ -8,31 +8,21 @@ import WizardNavigation from '@/Components/demo/WizardNavigation.vue';
 import RubricSetupStep from '@/Components/demo/steps/RubricSetupStep.vue';
 import QuestionPromptStep from '@/Components/demo/steps/QuestionPromptStep.vue';
 import ReviewPublishStep from '@/Components/demo/steps/ReviewPublishStep.vue';
-import StudentResponseStep from '@/Components/demo/steps/StudentResponseStep.vue';
-import AssessmentViewStep from '@/Components/demo/steps/AssessmentViewStep.vue';
 
 const page = usePage();
 const user = computed(() => (page.props.auth as { user: { name: string } | null })?.user ?? null);
 const axios = (window as any).axios;
 const wizard = useWizardStore();
 
-wizard.setMode('demo');
+wizard.setMode('assignment');
+wizard.resetForm();
 
-// Get sessionId from route params
-const sessionId = computed(() => (page.props as { sessionId?: string }).sessionId);
-
-// Load session state on mount
-onMounted(() => {
-    if (sessionId.value) {
-        wizard.loadState(sessionId.value);
-    }
-});
-
-const saveRubric = (publish = false) => {
-    // Validate all steps before proceeding
+const saveAssignment = () => {
     if (!wizard.validateStep(1) || !wizard.validateStep(2) || !wizard.validateStep(3)) {
         return;
     }
+
+    wizard.isSaving = true;
 
     const payload = {
         title: wizard.title,
@@ -40,43 +30,39 @@ const saveRubric = (publish = false) => {
         questions: wizard.questions.map((item) => ({ id: item.id, prompt: item.prompt })),
         levels: wizard.levels.slice(),
         criteria: wizard.criteria.map((c) => ({ id: c.id, name: c.name, cells: c.cells.slice() })),
-        session_id: sessionId.value || null,
-        publish,
     };
 
     axios
         .post('/assignments', payload)
         .then((res) => {
-            // Store assignment_id and demo_id in wizard store for later use in assessment
             if (res.data.data) {
                 wizard.assignment_id = res.data.data.assignment_id;
                 wizard.demo_id = res.data.data.demo_id;
             }
 
             wizard.showModal(
-                'Success',
-                `Your rubric has been ${publish ? 'published' : 'saved as draft'} successfully!`,
+                'Assignment created',
+                'Your assignment is on the dashboard. You can add student papers next.',
                 'success',
             );
-            // Only reset form if saving as draft, not on publish
-            if (!publish) {
-                setTimeout(() => {
-                    wizard.resetForm();
-                }, 1500);
-            }
+
+            setTimeout(() => {
+                router.visit(route('dashboard'));
+            }, 800);
         })
         .catch((err) => {
-            console.error(err);
             wizard.showModal(
                 'Save Failed',
                 err.response?.data?.message || err.message || 'An error occurred while saving.',
                 'error',
             );
+        })
+        .finally(() => {
+            wizard.isSaving = false;
         });
 };
 
 const getAIRubricSuggestion = () => {
-    // Fall back on title if question is not yet present
     const context = wizard.question.trim() || wizard.title;
 
     if (!context.trim()) {
@@ -103,7 +89,6 @@ const getAIRubricSuggestion = () => {
             try {
                 const data = res.data || {};
                 if (data.success && data.rubric && Array.isArray(data.rubric.criteria)) {
-                    // Update level names and ranges if provided
                     if (data.levels && Array.isArray(data.levels)) {
                         data.levels.forEach((suggestedLevel, idx) => {
                             if (idx < wizard.levels.length) {
@@ -113,7 +98,6 @@ const getAIRubricSuggestion = () => {
                         });
                     }
 
-                    // Map returned criteria into local shape
                     wizard.criteria = data.rubric.criteria.map((c, idx) => ({
                         id: `c-ai-${Date.now()}-${idx}`,
                         name: c.name || `Criterion ${idx + 1}`,
@@ -152,66 +136,52 @@ const getAIRubricSuggestion = () => {
 </script>
 
 <template>
-    <Head title="Rubric Editor — Critari" />
+    <Head title="Create Assignment" />
 
-    <div class="flex flex-col min-h-screen text-slate-900">
-        <!-- Nav -->
+    <div class="flex min-h-screen flex-col text-slate-900">
         <nav
             class="sticky top-0 z-50 border-b border-indigo-700 bg-indigo-600 px-6 py-4 backdrop-blur-xl"
         >
             <div class="mx-auto flex max-w-full items-center justify-between">
                 <Link
-                    :href="route('demos.index')"
+                    :href="route('dashboard')"
                     class="text-xl font-black tracking-tight text-white"
                 >
                     critari<span class="text-indigo-200">.</span>
                 </Link>
 
                 <div class="flex items-center space-x-4">
-                    <template v-if="user">
-                        <Link
-                            :href="route('dashboard')"
-                            class="text-xs font-bold uppercase tracking-wider text-indigo-100 transition-colors hover:text-white"
-                        >
-                            Dashboard
-                        </Link>
-                    </template>
-                    <template v-else>
-                        <Link
-                            :href="route('login')"
-                            class="text-xs font-bold uppercase tracking-wider text-indigo-100 transition-colors hover:text-white"
-                        >
-                            Sign In
-                        </Link>
-                        <Link
-                            :href="route('register')"
-                            class="rounded-lg border border-indigo-400 bg-indigo-700 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-indigo-800"
-                        >
-                            Get Started
-                        </Link>
-                    </template>
+                    <Link
+                        :href="route('dashboard')"
+                        class="text-xs font-bold uppercase tracking-wider text-indigo-100 transition-colors hover:text-white"
+                    >
+                        Cancel
+                    </Link>
+                    <span
+                        v-if="user"
+                        class="text-xs font-bold uppercase tracking-wider text-white"
+                    >
+                        {{ user.name }}
+                    </span>
                 </div>
             </div>
         </nav>
 
-        <!-- Main Content + Sidebar Container -->
         <div class="flex flex-1">
-            <!-- Left: Main Content Area -->
             <div class="flex-1 overflow-y-auto">
                 <div class="w-full px-6 py-10">
-                    <!-- Step Header -->
-                    <header class="mb-8 max-w-6xl mx-auto">
+                    <header class="mx-auto mb-8 max-w-6xl">
                         <div class="mb-4">
                             <h1 class="text-3xl font-bold text-slate-900">
                                 {{ wizard.currentStepData.name }}
                             </h1>
-                            <p class="text-slate-500 mt-2">
+                            <p class="mt-2 text-slate-500">
                                 {{ wizard.currentStepData.description }}
                             </p>
                         </div>
-                        <div class="w-full bg-slate-200 rounded-full h-2">
+                        <div class="h-2 w-full rounded-full bg-slate-200">
                             <div
-                                class="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                                class="h-2 rounded-full bg-indigo-600 transition-all duration-300"
                                 :style="{
                                     width: `${(wizard.currentStep / wizard.totalSteps) * 100}%`,
                                 }"
@@ -219,48 +189,34 @@ const getAIRubricSuggestion = () => {
                         </div>
                     </header>
 
-                    <div class="max-w-6xl mx-auto">
-                        <form @submit.prevent="saveRubric(true)">
-                            <!-- Step 1: Rubric Setup -->
+                    <div class="mx-auto max-w-6xl">
+                        <form @submit.prevent="saveAssignment">
                             <div v-show="wizard.currentStep === 1" class="animate-fade-in">
                                 <RubricSetupStep @ai-suggest="getAIRubricSuggestion" />
                             </div>
 
-                            <!-- Step 2: Question Prompt -->
                             <div v-show="wizard.currentStep === 2" class="animate-fade-in">
                                 <QuestionPromptStep />
                             </div>
 
-                            <!-- Step 3: Review & Publish -->
                             <div v-show="wizard.currentStep === 3" class="animate-fade-in">
-                                <ReviewPublishStep />
+                                <ReviewPublishStep
+                                    title="Ready to create"
+                                    message="Confirm the rubric and prompt, then create this assignment. It will show up on your dashboard."
+                                    hint="You can add student papers after this."
+                                    :show-summary="true"
+                                />
                             </div>
 
-                            <!-- Step 4: Student Response -->
-                            <div v-show="wizard.currentStep === 4" class="animate-fade-in">
-                                <StudentResponseStep />
-                            </div>
-
-                            <!-- Step 5: AI Assessment -->
-                            <div v-show="wizard.currentStep === 5" class="animate-fade-in">
-                                <AssessmentViewStep />
-                            </div>
-
-                            <!-- Navigation -->
-                            <WizardNavigation
-                                @save-draft="saveRubric(false)"
-                                @publish="saveRubric(true)"
-                            />
+                            <WizardNavigation @publish="saveAssignment" />
                         </form>
                     </div>
                 </div>
             </div>
 
-            <!-- Right: Sidebar -->
             <WizardSidebar />
         </div>
 
-        <!-- Modal -->
         <WizardModal />
     </div>
 </template>
@@ -277,20 +233,7 @@ const getAIRubricSuggestion = () => {
     }
 }
 
-@keyframes spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
-}
-
 .animate-fade-in {
     animation: fade-in 0.3s ease-out;
-}
-
-.animate-spin {
-    animation: spin 1s linear infinite;
 }
 </style>

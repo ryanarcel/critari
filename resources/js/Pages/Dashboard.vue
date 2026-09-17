@@ -18,7 +18,7 @@ interface StatItem {
 interface Assignment {
     id: number;
     title: string;
-    class: string;
+    class: string | null;
     submissions_completed: number;
     submissions_total: number;
     status: string;
@@ -173,10 +173,10 @@ const handleLogout = () => {
                     </p>
                 </div>
 
-                <Link
-                    href="/assignments/create"
-                    class="rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-bold text-white transition-all hover:bg-indigo-500"
-                >
+                                <Link
+                                :href="route('assignments.create')"
+                                class="rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-bold text-white transition-all hover:bg-indigo-500"
+                            >
                     + Create New Assignment
                 </Link>
             </div>
@@ -256,7 +256,7 @@ const handleLogout = () => {
                                         {{ assignment.title }}
                                     </td>
                                     <td class="px-6 py-4 text-sm text-slate-600">
-                                        {{ assignment.class }}
+                                        {{ assignment.class || '—' }}
                                     </td>
                                     <td class="px-6 py-4 text-sm text-slate-600">
                                         {{ assignment.submissions_completed }} /
@@ -306,6 +306,12 @@ const handleLogout = () => {
                     </div>
                     <div v-if="props.assignments.length === 0" class="px-6 py-12 text-center">
                         <p class="text-slate-600">No assignments yet. Create one to get started!</p>
+                        <Link
+                            :href="route('assignments.create')"
+                            class="mt-4 inline-block text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                        >
+                            Create assignment
+                        </Link>
                     </div>
                 </div>
             </div>
@@ -313,7 +319,10 @@ const handleLogout = () => {
             <!-- Quick Actions Section -->
             <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <!-- Build Custom Rubric -->
-                <div class="rounded-lg border-2 border-dashed border-slate-300 bg-white p-8">
+                <Link
+                    :href="route('assignments.create')"
+                    class="rounded-lg border-2 border-dashed border-slate-300 bg-white p-8 transition-colors hover:border-indigo-400 hover:bg-indigo-50/40"
+                >
                     <div
                         class="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-100"
                     >
@@ -335,7 +344,7 @@ const handleLogout = () => {
                     <p class="text-sm text-slate-600">
                         Use AI Assistant or create manual matrix templates for reuse.
                     </p>
-                </div>
+                </Link>
 
                 <!-- Recently Saved Rubrics -->
                 <div class="rounded-lg bg-white p-6 shadow-sm">

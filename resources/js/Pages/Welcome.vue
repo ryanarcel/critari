@@ -66,7 +66,7 @@ const generateSessionId = () => {
             </div>
 
             <h1
-                class="mx-auto mb-8 max-w-4xl text-4xl font-extrabold leading-[1.15] tracking-tight text-slate-900 sm:text-6xl"
+                class="mx-auto mb-6 max-w-4xl text-4xl font-extrabold leading-[1.15] tracking-tight text-slate-900 sm:text-6xl"
             >
                 End Teacher Burnout with
                 <span
@@ -75,6 +75,13 @@ const generateSessionId = () => {
                     Instant Essay Evaluation
                 </span>
             </h1>
+
+            <p
+                class="mx-auto mb-8 max-w-2xl text-xl font-medium leading-snug text-slate-500 sm:text-2xl"
+            >
+                <span class="font-semibold text-indigo-600">AI</span>
+                that grades essays to your rubric
+            </p>
 
             <p
                 class="mx-auto mb-12 max-w-2xl text-base font-light leading-relaxed text-slate-400 sm:text-lg"

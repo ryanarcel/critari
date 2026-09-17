@@ -12,9 +12,19 @@
         <div v-else></div>
 
         <div class="flex items-center gap-3">
+            <button
+                v-if="wizard.currentStep === 3 && wizard.mode === 'assignment'"
+                type="button"
+                :disabled="wizard.isSaving"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                @click.prevent="emit('publish')"
+            >
+                <span>{{ wizard.isSaving ? 'Creating...' : 'Create Assignment' }}</span>
+                <ArrowRightIcon class="w-4 h-4" />
+            </button>
             <!-- Step 3: Show Publish button to save and advance -->
             <button
-                v-if="wizard.currentStep === 3"
+                v-if="wizard.currentStep === 3 && wizard.mode === 'demo'"
                 type="button"
                 class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition shadow"
                 @click.prevent="publishAndProceed"

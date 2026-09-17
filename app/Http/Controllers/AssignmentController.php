@@ -5,12 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\Assignment;
 use App\Models\Criterion;
 use App\Models\Demo;
+use App\Models\Question;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Inertia\Response;
 use OpenAI\Laravel\Facades\OpenAI;
 
 class AssignmentController extends Controller
@@ -18,17 +22,14 @@ class AssignmentController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
-    {
-        //
-    }
+    public function index() {}
 
     /**
      * Show the form for creating a new resource.
      */
-    public function create()
+    public function create(): Response
     {
-        //
+        return Inertia::render('Assignments/Create');
     }
 
     /**
@@ -36,15 +37,15 @@ class AssignmentController extends Controller
      */
     public function store(Request $request)
     {
-        // Log raw request for debugging
         Log::info('Assignment store raw request: '.json_encode($request->all()));
         error_log('Assignment store raw request: '.json_encode($request->all()));
 
-        // Validate incoming data
         try {
             $validated = $request->validate([
                 'title' => 'required|string|max:255',
-                'question' => 'required|string',
+                'question' => 'required_without:questions|nullable|string',
+                'questions' => 'required_without:question|nullable|array|min:1',
+                'questions.*.prompt' => 'required_with:questions|string',
                 'levels' => 'required|array|min:1',
                 'criteria' => 'required|array|min:1',
                 'session_id' => 'nullable|string|max:255',
@@ -55,46 +56,76 @@ class AssignmentController extends Controller
             throw $ve;
         }
 
+        $isDemo = filled($validated['session_id'] ?? null);
+
+        if (! $isDemo && ! Auth::check()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You must be signed in to create an assignment.',
+            ], 401);
+        }
+
         try {
-            // Log incoming validated payload for debugging
             Log::info('Assignment store payload: '.json_encode($validated));
             error_log('Assignment store payload: '.json_encode($validated));
-            // Wrap database operations in a transaction
-            $result = DB::transaction(function () use ($validated) {
-                // Calculate max score based on the highest level's range
-                // E.g., if Excellent level has range "9-10", max score per criterion is 10
+            $result = DB::transaction(function () use ($validated, $isDemo) {
                 $levels = $validated['levels'];
                 $criteriaCount = count($validated['criteria']);
 
-                // Get the last level (should be the highest scoring level)
                 $maxLevel = end($levels);
                 $rangeString = $maxLevel['range'] ?? '0-0';
 
-                // Extract the maximum value from the range (format: "min-max")
                 $rangeParts = explode('-', $rangeString);
                 $maxScorePerCriterion = (int) end($rangeParts);
 
-                // Calculate total max score
                 $maxScore = $maxScorePerCriterion * $criteriaCount;
 
-                // 1. Create or update Demo record using session_id as identifier
-                $demo = Demo::updateOrCreate(
-                    ['session_id' => $validated['session_id'] ?? null],
-                    ['title' => $validated['title']]
+                $questions = Assignment::normalizeQuestions(
+                    $validated['questions'] ?? [['prompt' => $validated['question'] ?? '']]
                 );
 
-                // 2. Create or update Assignment record using demo_id as identifier
-                $assignment = Assignment::updateOrCreate(
-                    ['demo_id' => $demo->id],
-                    [
-                        'title' => $validated['title'],
-                        'description' => $validated['question'], // Maps 'question' to 'description'
-                        'levels' => $validated['levels'], // Store levels as array (will be auto-JSON encoded)
-                        'max_score' => $maxScore,
-                    ]
-                );
+                if ($questions === []) {
+                    throw ValidationException::withMessages([
+                        'questions' => 'Please enter at least one assignment question.',
+                    ]);
+                }
 
-                // 3. Delete old criteria for this assignment and recreate them
+                $assignmentAttributes = [
+                    'title' => $validated['title'],
+                    'levels' => $validated['levels'],
+                    'max_score' => $maxScore,
+                ];
+
+                $demo = null;
+
+                if ($isDemo) {
+                    $demo = Demo::updateOrCreate(
+                        ['session_id' => $validated['session_id']],
+                        ['title' => $validated['title']]
+                    );
+
+                    $assignment = Assignment::updateOrCreate(
+                        ['demo_id' => $demo->id],
+                        $assignmentAttributes
+                    );
+                } else {
+                    $assignment = Assignment::create([
+                        ...$assignmentAttributes,
+                        'demo_id' => null,
+                        'created_by' => Auth::id(),
+                    ]);
+                }
+
+                Question::where('assignment_id', $assignment->id)->delete();
+
+                foreach ($questions as $index => $question) {
+                    Question::create([
+                        'assignment_id' => $assignment->id,
+                        'prompt' => $question['prompt'],
+                        'order' => $index,
+                    ]);
+                }
+
                 Criterion::where('assignment_id', $assignment->id)->delete();
 
                 foreach ($validated['criteria'] as $criteriaItem) {
@@ -108,7 +139,7 @@ class AssignmentController extends Controller
 
                 return [
                     'assignment_id' => $assignment->id,
-                    'demo_id' => $demo->id,
+                    'demo_id' => $demo?->id,
                 ];
             });
 
@@ -137,34 +168,22 @@ class AssignmentController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
-    {
-        //
-    }
+    public function show(string $id) {}
 
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(string $id)
-    {
-        //
-    }
+    public function edit(string $id) {}
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
+    public function update(Request $request, string $id) {}
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
-    {
-        //
-    }
+    public function destroy(string $id) {}
 
     public function getAIRubricSuggestion(Request $request): JsonResponse
     {
@@ -175,7 +194,6 @@ class AssignmentController extends Controller
             'num_criteria' => 'nullable|integer|min:1|max:20',
         ]);
 
-        // Ensure at least one of question or title is provided
         if (empty($validated['question']) && empty($validated['title'])) {
             return response()->json([
                 'success' => false,
@@ -187,17 +205,14 @@ class AssignmentController extends Controller
         $title = $validated['title'];
         $levels = $validated['levels'];
         $numLevels = count($levels);
-        $numCriteria = $validated['num_criteria'] ?? 3; // Default to 3 criteria if not specified
+        $numCriteria = $validated['num_criteria'] ?? 3;
 
-        // Use question if available, otherwise fall back to title
         $context = $question ?? $title;
         $contextLabel = $question ? 'QUESTION' : 'RUBRIC TITLE';
 
-        // Build a sample cell structure based on the number of levels
         $sampleCells = array_fill(0, $numLevels, '"Cell description"');
         $cellsExample = implode(', ', $sampleCells);
 
-        // PART 1: Generate level names
         $levelNamesPrompt = "You are an expert academic assessment designer. Generate exactly {$numLevels} performance level names that form a clear progression from poor to excellent performance.";
 
         if (! empty($context)) {
@@ -232,7 +247,6 @@ class AssignmentController extends Controller
                 Choose level names that are appropriate for academic assessment, clear and professional, form a logical progression, and are diverse and varied.";
 
         try {
-            // Get level name suggestions
             $levelResponse = OpenAI::chat()->create([
                 'model' => 'gpt-4o-mini',
                 'messages' => [
@@ -250,7 +264,6 @@ class AssignmentController extends Controller
                 throw new \Exception('Invalid level names returned from AI.');
             }
 
-            // PART 2: Generate criteria
             $levelsFormatted = collect($suggestedLevels)
                 ->map(fn ($lvl) => "- {$lvl['name']} ({$lvl['range']} pts)")
                 ->implode("\n");
@@ -322,7 +335,6 @@ class AssignmentController extends Controller
         $question = $validated['question'];
         $title = $validated['title'];
 
-        // Use question if available, otherwise fall back to title
         $context = ($question && ! empty($question)) ? $question : $title;
         $contextLabel = ($question && ! empty($question)) ? 'QUESTION' : 'RUBRIC TITLE';
 
@@ -382,7 +394,6 @@ class AssignmentController extends Controller
 
             $rawContent = $response->choices[0]->message->content;
 
-            // Clean up any markdown formatting
             $cleanJson = preg_replace('/^```json|^```|```$/m', '', trim($rawContent));
             $data = json_decode($cleanJson, true);
 
@@ -390,7 +401,6 @@ class AssignmentController extends Controller
                 throw new \Exception('Invalid JSON returned from AI.');
             }
 
-            // Validate we got the right number of levels
             if (! is_array($data) || count($data) !== $numLevels) {
                 throw new \Exception("AI did not return exactly {$numLevels} levels.");
             }

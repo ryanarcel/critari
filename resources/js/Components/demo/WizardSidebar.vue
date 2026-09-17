@@ -24,6 +24,7 @@
 
                 <!-- Student Section -->
                 <StepSection
+                    v-if="wizard.steps.some((s) => s.section === 'Student')"
                     emoji="👤"
                     title="Student Response"
                     :steps="wizard.steps.filter((s) => s.section === 'Student')"
@@ -31,6 +32,7 @@
 
                 <!-- Assessment Section -->
                 <StepSection
+                    v-if="wizard.steps.some((s) => s.section === 'Assessment')"
                     emoji="🤖"
                     title="AI Assessment"
                     :steps="wizard.steps.filter((s) => s.section === 'Assessment')"

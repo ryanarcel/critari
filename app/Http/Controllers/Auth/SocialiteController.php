@@ -81,8 +81,6 @@ class SocialiteController extends Controller
                 'tenant_id' => $tenant?->id,
             ]);
 
-            // Generate temporary token (5 minutes expiry) to pass auth data across domain boundary
-            // Store in landlord database (bypasses Tenancy wrapper)
             $token = Str::random(40);
             DB::connection('landlord')->table('o_auth_states')->insert([
                 'token' => $token,
@@ -127,7 +125,6 @@ class SocialiteController extends Controller
                 throw new \Exception('Invalid or expired OAuth token');
             }
 
-            // Parse the stored data
             $data = json_decode($record->tenant_host, true);
             $userId = $data['user_id'] ?? null;
 
@@ -135,7 +132,6 @@ class SocialiteController extends Controller
                 throw new \Exception('Invalid token data');
             }
 
-            // Delete the token (one-time use)
             DB::connection('landlord')
                 ->table('o_auth_states')
                 ->where('token', $token)
@@ -151,10 +147,8 @@ class SocialiteController extends Controller
                 'token' => $token,
             ]);
 
-            // Create session on subdomain (app.localhost)
             Auth::login($user, remember: true);
 
-            // Explicitly save session before creating response
             session()->save();
 
             $sessionId = session()->getId();
