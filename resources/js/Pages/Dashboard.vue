@@ -22,6 +22,7 @@ interface Assignment {
     submissions_completed: number;
     submissions_total: number;
     status: string;
+    join_code: string | null;
     created_at: string;
 }
 
@@ -253,7 +254,18 @@ const handleLogout = () => {
                                     class="transition-colors hover:bg-slate-50"
                                 >
                                     <td class="px-6 py-4 text-sm font-medium text-slate-900">
-                                        {{ assignment.title }}
+                                        <Link
+                                            :href="route('assignments.show', assignment.id)"
+                                            class="text-indigo-600 hover:text-indigo-700"
+                                        >
+                                            {{ assignment.title }}
+                                        </Link>
+                                        <p
+                                            v-if="assignment.join_code"
+                                            class="mt-1 font-mono text-xs tracking-widest text-slate-400"
+                                        >
+                                            {{ assignment.join_code }}
+                                        </p>
                                     </td>
                                     <td class="px-6 py-4 text-sm text-slate-600">
                                         {{ assignment.class || '—' }}
@@ -274,30 +286,12 @@ const handleLogout = () => {
                                     </td>
                                     <td class="px-6 py-4 text-sm">
                                         <div class="flex space-x-2">
-                                            <button
-                                                v-if="assignment.status === 'Graded'"
+                                            <Link
+                                                :href="route('assignments.show', assignment.id)"
                                                 class="text-indigo-600 transition-colors hover:text-indigo-700"
                                             >
-                                                [ Review & Release ]
-                                            </button>
-                                            <button
-                                                v-else-if="assignment.status === 'Grading'"
-                                                class="text-indigo-600 transition-colors hover:text-indigo-700"
-                                            >
-                                                [ View Progress ]
-                                            </button>
-                                            <template v-else>
-                                                <button
-                                                    class="text-indigo-600 transition-colors hover:text-indigo-700"
-                                                >
-                                                    [ Edit ]
-                                                </button>
-                                                <button
-                                                    class="text-indigo-600 transition-colors hover:text-indigo-700"
-                                                >
-                                                    [ Upload ]
-                                                </button>
-                                            </template>
+                                                Open
+                                            </Link>
                                         </div>
                                     </td>
                                 </tr>
@@ -352,12 +346,12 @@ const handleLogout = () => {
                     <ul class="space-y-2">
                         <li v-for="rubric in props.recentRubrics" :key="rubric.id" class="flex">
                             <span class="text-slate-600">•</span>
-                            <a
-                                href="#"
+                            <Link
+                                :href="route('assignments.show', rubric.id)"
                                 class="ml-2 text-sm text-indigo-600 transition-colors hover:text-indigo-700"
                             >
                                 {{ rubric.name }}
-                            </a>
+                            </Link>
                         </li>
                         <li v-if="props.recentRubrics.length === 0" class="text-sm text-slate-600">
                             No rubrics saved yet

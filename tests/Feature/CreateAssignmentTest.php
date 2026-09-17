@@ -94,6 +94,8 @@ class CreateAssignmentTest extends TestCase
                 $assignment->questions->pluck('prompt')->all()
             );
             $this->assertEquals(1, Criterion::where('assignment_id', $assignment->id)->count());
+            $this->assertNotNull($assignment->join_code);
+            $this->assertSame(6, strlen($assignment->join_code));
         });
     }
 
@@ -119,6 +121,7 @@ class CreateAssignmentTest extends TestCase
             $this->assertNotNull($assignment);
             $this->assertSame($demo->id, $assignment->demo_id);
             $this->assertNull($assignment->created_by);
+            $this->assertNull($assignment->join_code);
         });
     }
 

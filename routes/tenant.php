@@ -29,7 +29,10 @@ Route::middleware([InitializeTenancyBySubdomain::class, PreventAccessFromCentral
         Route::get('/assignments/create', [AssignmentController::class, 'create'])
             ->middleware('auth')
             ->name('assignments.create');
-        Route::resource('assignments', AssignmentController::class)->except(['create']);
+        Route::get('/assignments/{assignment}', [AssignmentController::class, 'show'])
+            ->middleware('auth')
+            ->name('assignments.show');
+        Route::resource('assignments', AssignmentController::class)->except(['create', 'show']);
         Route::resource('submissions', SubmissionController::class);
         Route::post('/submissions/{submission}/assess', [SubmissionController::class, 'processAIAssessment'])
             ->name('submissions.assess');
@@ -46,5 +49,10 @@ Route::middleware([InitializeTenancyBySubdomain::class, PreventAccessFromCentral
 
             Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
             Route::get('/student', [StudentController::class, 'home'])->name('student.home');
+            Route::post('/student/join', [StudentController::class, 'join'])->name('student.join');
+            Route::get('/student/assignments/{assignment}', [StudentController::class, 'show'])
+                ->name('student.assignments.show');
+            Route::post('/student/assignments/{assignment}', [StudentController::class, 'submit'])
+                ->name('student.assignments.submit');
         });
     });

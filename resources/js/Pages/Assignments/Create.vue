@@ -42,7 +42,7 @@ const saveAssignment = () => {
 
             wizard.showModal(
                 'Assignment created',
-                'Your assignment is on the dashboard. You can add student papers next.',
+                'Your assignment is on the dashboard. Share the student code so they can submit from their accounts.',
                 'success',
             );
 

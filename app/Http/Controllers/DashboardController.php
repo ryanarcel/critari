@@ -41,6 +41,7 @@ class DashboardController extends Controller
             ->get();
 
         $totalPapersGraded = Submission::whereIn('assignment_id', $assignments->pluck('id'))
+            ->whereNotNull('user_id')
             ->where('status', 'graded')
             ->count();
 
@@ -50,7 +51,10 @@ class DashboardController extends Controller
         $hoursSaved = round($minutesSaved / 60, 1);
 
         $assignmentsList = $assignments->map(function ($assignment) {
-            $submissions = Submission::where('assignment_id', $assignment->id)->get();
+            $submissions = Submission::query()
+                ->where('assignment_id', $assignment->id)
+                ->whereNotNull('user_id')
+                ->get();
             $gradedCount = $submissions->where('status', 'graded')->count();
             $totalCount = $submissions->count();
 
@@ -71,6 +75,7 @@ class DashboardController extends Controller
                 'submissions_completed' => $gradedCount,
                 'submissions_total' => $totalCount,
                 'status' => $status,
+                'join_code' => $assignment->join_code,
                 'created_at' => $assignment->created_at,
             ];
         })->values();

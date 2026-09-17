@@ -11,6 +11,7 @@ class CriterionScore extends Model
     protected $fillable = [
         'submission_id',
         'criterion_id',
+        'question_id',
         'score',
         'feedback',
     ];
@@ -19,6 +20,7 @@ class CriterionScore extends Model
         'id' => 'integer',
         'submission_id' => 'integer',
         'criterion_id' => 'integer',
+        'question_id' => 'integer',
         'points_awarded' => 'integer',
     ];
 
@@ -30,5 +32,10 @@ class CriterionScore extends Model
     public function criterion()
     {
         return $this->belongsTo(Criterion::class);
+    }
+
+    public function question()
+    {
+        return $this->belongsTo(Question::class);
     }
 }

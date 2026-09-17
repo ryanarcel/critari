@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -48,5 +49,15 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_superadmin' => 'boolean',
         ];
+    }
+
+    /**
+     * @return BelongsToMany<Assignment, $this>
+     */
+    public function assignments(): BelongsToMany
+    {
+        return $this->belongsToMany(Assignment::class)
+            ->withPivot('role', 'assigned_at')
+            ->withTimestamps();
     }
 }

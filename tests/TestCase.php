@@ -34,7 +34,9 @@ abstract class TestCase extends BaseTestCase
 
         if (! Schema::hasTable('questions')
             || Schema::hasColumn('assignments', 'description')
-            || ! Schema::hasColumn('users', 'role')) {
+            || ! Schema::hasColumn('users', 'role')
+            || ! Schema::hasColumn('assignments', 'join_code')
+            || ! Schema::hasColumn('criterion_scores', 'question_id')) {
             $this->artisan('tenants:migrate', [
                 '--tenants' => [$this->tenantId],
                 '--force' => true,

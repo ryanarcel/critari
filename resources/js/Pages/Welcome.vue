@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
-import LoginModal from '@/Components/Auth/LoginModal.vue';
 
 const page = usePage();
 const user = computed(() => (page.props.auth as { user: { name: string } | null })?.user ?? null);
-const showLoginModal = ref(false);
 
 const generateSessionId = () => {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -48,15 +46,6 @@ const generateSessionId = () => {
                         >
                             Dashboard
                         </Link>
-                    </template>
-                    <template v-else>
-                        <button
-                            type="button"
-                            class="text-xs font-bold uppercase tracking-wider text-indigo-100 transition-colors hover:text-white"
-                            @click="showLoginModal = true"
-                        >
-                            Sign In
-                        </button>
                     </template>
                 </div>
             </div>
@@ -131,8 +120,5 @@ const generateSessionId = () => {
                 to see Critari in action!
             </p>
         </footer>
-
-        <!-- Login Modal -->
-        <LoginModal v-if="showLoginModal" @close="showLoginModal = false" />
     </div>
 </template>

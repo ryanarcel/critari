@@ -113,6 +113,7 @@ class AssignmentController extends Controller
                         ...$assignmentAttributes,
                         'demo_id' => null,
                         'created_by' => Auth::id(),
+                        'join_code' => Assignment::generateJoinCode(),
                     ]);
                 }
 
@@ -168,7 +169,51 @@ class AssignmentController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id) {}
+    public function show(Assignment $assignment): Response
+    {
+        abort_unless($assignment->ownedBy(Auth::user()), 404);
+
+        $assignment->load([
+            'questions',
+            'criteria',
+            'submissions' => fn ($query) => $query
+                ->whereNotNull('user_id')
+                ->with(['scores.criterion', 'user']),
+        ]);
+
+        return Inertia::render('Assignments/Show', [
+            'user' => [
+                'name' => Auth::user()->name,
+            ],
+            'assignment' => [
+                'id' => $assignment->id,
+                'title' => $assignment->title,
+                'join_code' => $assignment->join_code,
+                'max_score' => $assignment->max_score,
+                'overall_max_score' => $assignment->overallMaxScore(),
+                'questions' => $assignment->questions->map(fn (Question $question) => [
+                    'id' => $question->id,
+                    'prompt' => $question->prompt,
+                ])->values(),
+                'criteria' => $assignment->criteria->map(fn (Criterion $criterion) => [
+                    'id' => $criterion->id,
+                    'name' => $criterion->name,
+                ])->values(),
+                'submissions' => $assignment->submissions->map(fn ($submission) => [
+                    'id' => $submission->id,
+                    'student_name' => $submission->user?->name
+                        ?? $submission->payload['student_name']
+                        ?? 'Untitled paper',
+                    'student_response' => $submission->payload['student_response'] ?? '',
+                    'overall_feedback' => $submission->payload['overall_feedback'] ?? null,
+                    'status' => $submission->status,
+                    'score' => $submission->score,
+                    'submitted_at' => $submission->submitted_at,
+                    'question_grades' => $submission->questionGrades($assignment),
+                ])->values(),
+            ],
+        ]);
+    }
 
     /**
      * Show the form for editing the specified resource.
