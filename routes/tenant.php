@@ -4,6 +4,7 @@ use App\Http\Controllers\AssignmentController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\SocialiteController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\StudentController;
 use App\Http\Controllers\SubmissionController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -44,5 +45,6 @@ Route::middleware([InitializeTenancyBySubdomain::class, PreventAccessFromCentral
                 ->name('tenant.logout');
 
             Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+            Route::get('/student', [StudentController::class, 'home'])->name('student.home');
         });
     });

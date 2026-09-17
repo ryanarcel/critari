@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Assignment;
 use App\Models\Submission;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -11,7 +12,7 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function index(): Response
+    public function index(): Response|RedirectResponse
     {
         Log::info('Dashboard - request received', [
             'session_id' => session()->getId(),
@@ -26,6 +27,10 @@ class DashboardController extends Controller
             Log::warning('Dashboard accessed without authenticated user');
 
             return redirect()->route('login');
+        }
+
+        if ($user->role === 'student') {
+            return redirect()->route('student.home');
         }
 
         $assignments = Assignment::query()

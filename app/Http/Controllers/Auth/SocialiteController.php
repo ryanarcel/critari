@@ -7,6 +7,7 @@ use App\Models\OAuthState;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -20,14 +21,19 @@ class SocialiteController extends Controller
      * Redirect to Google OAuth
      * Store tenant mapping in database with a custom state token
      */
-    public function redirect(): RedirectResponse
+    public function redirect(Request $request): RedirectResponse
     {
-        $tenantHost = request()->getHost();
+        $validated = $request->validate([
+            'role' => ['required', 'in:teacher,student'],
+        ]);
+
+        $tenantHost = $request->getHost();
         $stateToken = Str::random(40);
 
         OAuthState::create([
             'token' => $stateToken,
             'tenant_host' => $tenantHost,
+            'intended_role' => $validated['role'],
             'expires_at' => now()->addHours(1),
         ]);
 
@@ -53,6 +59,9 @@ class SocialiteController extends Controller
             }
 
             $tenantHost = $oauthState->tenant_host;
+            $intendedRole = in_array($oauthState->intended_role, ['teacher', 'student'], true)
+                ? $oauthState->intended_role
+                : 'teacher';
             $oauthState->delete();
 
             $subdomain = explode('.', $tenantHost)[0];
@@ -66,39 +75,52 @@ class SocialiteController extends Controller
 
             $googleUser = Socialite::driver('google')->stateless()->user();
 
-            $user = User::updateOrCreate(
-                ['email' => $googleUser->getEmail()],
-                [
+            $user = User::query()->where('email', $googleUser->getEmail())->first();
+
+            if ($user) {
+                $user->update([
+                    'name' => $googleUser->getName(),
+                ]);
+            } else {
+                $user = User::create([
+                    'email' => $googleUser->getEmail(),
                     'name' => $googleUser->getName(),
                     'email_verified_at' => now(),
                     'password' => bcrypt(''),
-                ]
-            );
+                    'role' => $intendedRole,
+                ]);
+            }
 
             Log::info('OAuth callback - user created/updated', [
                 'user_id' => $user->id,
                 'user_email' => $user->email,
                 'tenant_id' => $tenant?->id,
+                'role' => $user->role,
             ]);
 
             $token = Str::random(40);
             DB::connection('landlord')->table('o_auth_states')->insert([
                 'token' => $token,
-                'tenant_host' => json_encode(['user_id' => $user->id, 'tenant_id' => $tenant?->id]),
+                'tenant_host' => json_encode([
+                    'user_id' => $user->id,
+                    'tenant_id' => $tenant?->id,
+                    'intended_role' => $intendedRole,
+                ]),
+                'intended_role' => $intendedRole,
                 'expires_at' => now()->addMinutes(5),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
             $protocol = request()->secure() ? 'https' : 'http';
-            $dashboardUrl = "{$protocol}://{$tenantHost}/auth/oauth/verify?token={$token}";
+            $verifyUrl = "{$protocol}://{$tenantHost}/auth/oauth/verify?token={$token}";
 
             Log::info('OAuth callback - redirecting to verify endpoint', [
-                'dashboard_url' => $dashboardUrl,
+                'verify_url' => $verifyUrl,
                 'token' => $token,
             ]);
 
-            return redirect($dashboardUrl);
+            return redirect($verifyUrl);
         } catch (\Exception $e) {
             Log::error('OAuth callback error', [
                 'message' => $e->getMessage(),
@@ -160,7 +182,17 @@ class SocialiteController extends Controller
                 'session_in_db' => DB::connection('landlord')->table('sessions')->where('id', $sessionId)->exists(),
             ]);
 
-            return redirect()->route('dashboard');
+            $redirect = $user->role === 'student'
+                ? redirect()->route('student.home')
+                : redirect()->route('dashboard');
+
+            $intendedRole = $data['intended_role'] ?? $record->intended_role ?? null;
+
+            if ($intendedRole && $intendedRole !== $user->role) {
+                $redirect->with('status', 'This Google account is already a '.$user->role.'.');
+            }
+
+            return $redirect;
         } catch (\Exception $e) {
             Log::error('OAuth verify error', [
                 'message' => $e->getMessage(),

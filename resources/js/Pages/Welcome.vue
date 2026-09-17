@@ -49,7 +49,15 @@ const generateSessionId = () => {
                             Dashboard
                         </Link>
                     </template>
-                    <!-- Public Sign In / Get Started buttons intentionally hidden -->
+                    <template v-else>
+                        <button
+                            type="button"
+                            class="text-xs font-bold uppercase tracking-wider text-indigo-100 transition-colors hover:text-white"
+                            @click="showLoginModal = true"
+                        >
+                            Sign In
+                        </button>
+                    </template>
                 </div>
             </div>
         </nav>

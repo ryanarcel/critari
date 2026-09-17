@@ -5,6 +5,7 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
+import GoogleRoleButtons from '@/Components/Auth/GoogleRoleButtons.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 
 defineProps({
@@ -35,6 +36,14 @@ const submit = () => {
 
         <div v-if="status" class="mb-4 text-sm font-medium text-green-600">
             {{ status }}
+        </div>
+
+        <GoogleRoleButtons class="mb-6" />
+
+        <div class="mb-6 flex items-center">
+            <div class="flex-1 border-t border-gray-200"></div>
+            <span class="px-3 text-xs uppercase tracking-wide text-gray-400">Or with email</span>
+            <div class="flex-1 border-t border-gray-200"></div>
         </div>
 
         <form @submit.prevent="submit">

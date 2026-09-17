@@ -14,7 +14,7 @@ abstract class TestCase extends BaseTestCase
 
     protected function initializeTenant(): Tenant
     {
-        if (! Schema::hasTable('tenants')) {
+        if (! Schema::hasTable('tenants') || ! Schema::hasColumn('o_auth_states', 'intended_role')) {
             $this->artisan('migrate', ['--force' => true]);
         }
 
@@ -32,7 +32,9 @@ abstract class TestCase extends BaseTestCase
 
         Tenancy::initialize($tenant);
 
-        if (! Schema::hasTable('questions') || Schema::hasColumn('assignments', 'description')) {
+        if (! Schema::hasTable('questions')
+            || Schema::hasColumn('assignments', 'description')
+            || ! Schema::hasColumn('users', 'role')) {
             $this->artisan('tenants:migrate', [
                 '--tenants' => [$this->tenantId],
                 '--force' => true,

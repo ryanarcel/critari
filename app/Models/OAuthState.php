@@ -6,7 +6,14 @@ use Illuminate\Database\Eloquent\Model;
 
 class OAuthState extends Model
 {
-    protected $fillable = ['token', 'tenant_host', 'expires_at'];
+    protected $connection = 'landlord';
+
+    protected $fillable = [
+        'token',
+        'tenant_host',
+        'intended_role',
+        'expires_at',
+    ];
 
     protected $casts = [
         'expires_at' => 'datetime',
