@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Assignment;
 use App\Models\CriterionScore;
 use App\Models\Demo;
+use App\Models\Question;
 use App\Models\Submission;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -441,6 +442,78 @@ class AssignmentGradingTest extends TestCase
             $this->assertNull($assignment->created_by);
             $this->assertNotNull($submission);
             $this->assertSame('graded', $submission->status);
+        });
+    }
+
+    public function test_demo_grades_each_question_response_against_the_full_rubric(): void
+    {
+        $tenant = $this->initializeTenant();
+        $sessionId = 'demo-session-'.uniqid();
+
+        $assignmentId = $this->postJson($this->tenantUrl('/assignments'), $this->assignmentPayload([
+            'title' => 'Demo Essay',
+            'question' => null,
+            'questions' => [
+                ['prompt' => 'Explain the causes of the Trojan War.'],
+                ['prompt' => "What does Hector's death reveal about honor?"],
+            ],
+            'session_id' => $sessionId,
+        ]))
+            ->assertCreated()
+            ->assertJsonPath('data.questions.0.prompt', 'Explain the causes of the Trojan War.')
+            ->assertJsonPath('data.questions.1.prompt', "What does Hector's death reveal about honor?")
+            ->json('data.assignment_id');
+
+        $demoId = $tenant->run(fn () => Demo::query()->where('session_id', $sessionId)->value('id'));
+        $questionIds = $tenant->run(fn () => Question::query()
+            ->where('assignment_id', $assignmentId)
+            ->orderBy('order')
+            ->pluck('id')
+            ->all());
+
+        $submissionId = $this->postJson($this->tenantUrl('/submissions'), [
+            'assignment_id' => $assignmentId,
+            'demo_id' => $demoId,
+            'answers' => [
+                ['question_id' => $questionIds[0], 'response' => 'The war began with the abduction of Helen.'],
+                ['question_id' => $questionIds[1], 'response' => 'Hector dies defending Troy.'],
+            ],
+        ])
+            ->assertCreated()
+            ->json('submission_id');
+
+        $this->fakeAssessmentResponses([
+            [
+                'score' => 8,
+                'feedback' => 'Clear argument.',
+                'overall_feedback' => 'Strong first answer.',
+            ],
+            [
+                'score' => 4,
+                'feedback' => 'Needs more evidence.',
+                'overall_feedback' => 'Partial second answer.',
+            ],
+        ]);
+
+        $this->postJson($this->tenantUrl('/submissions/'.$submissionId.'/assess'), [
+            'submission_id' => $submissionId,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('total_score', 12)
+            ->assertJsonPath('max_score', 20)
+            ->assertJsonCount(2, 'question_grades')
+            ->assertJsonPath('question_grades.0.score', 8)
+            ->assertJsonPath('question_grades.0.max_score', 10)
+            ->assertJsonPath('question_grades.1.score', 4)
+            ->assertJsonPath('question_grades.1.max_score', 10);
+
+        $tenant->run(function () use ($submissionId) {
+            $submission = Submission::query()->with('scores')->find($submissionId);
+
+            $this->assertNotNull($submission);
+            $this->assertEquals(12, $submission->score);
+            $this->assertCount(2, $submission->scores->pluck('question_id')->filter()->unique());
         });
     }
 

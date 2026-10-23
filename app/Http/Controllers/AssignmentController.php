@@ -119,12 +119,19 @@ class AssignmentController extends Controller
 
                 Question::where('assignment_id', $assignment->id)->delete();
 
+                $createdQuestions = [];
+
                 foreach ($questions as $index => $question) {
-                    Question::create([
+                    $createdQuestion = Question::create([
                         'assignment_id' => $assignment->id,
                         'prompt' => $question['prompt'],
                         'order' => $index,
                     ]);
+
+                    $createdQuestions[] = [
+                        'id' => $createdQuestion->id,
+                        'prompt' => $createdQuestion->prompt,
+                    ];
                 }
 
                 Criterion::where('assignment_id', $assignment->id)->delete();
@@ -141,6 +148,7 @@ class AssignmentController extends Controller
                 return [
                     'assignment_id' => $assignment->id,
                     'demo_id' => $demo?->id,
+                    'questions' => $createdQuestions,
                 ];
             });
 

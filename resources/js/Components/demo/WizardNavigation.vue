@@ -111,6 +111,10 @@ const submitStudentAnswer = async () => {
         const submissionRes = await axios.post('/submissions', {
             assignment_id: assignmentId,
             student_response: wizard.studentAnswer,
+            answers: wizard.questions.map((question) => ({
+                question_id: Number(question.id),
+                response: (wizard.studentAnswers[question.id] ?? '').trim(),
+            })),
             demo_id: wizard.demo_id,
         });
 
@@ -135,7 +139,11 @@ const submitStudentAnswer = async () => {
         }
 
         // Step 3: Store assessment results in wizard store
-        wizard.setAssessmentResults(assessmentRes.data.scores, assessmentRes.data.max_score);
+        wizard.setAssessmentResults(
+            assessmentRes.data.scores,
+            assessmentRes.data.max_score,
+            assessmentRes.data.question_grades ?? [],
+        );
 
         // Step 4: Show success and advance
         wizard.showModal('Assessed', 'Student answer assessed successfully!', 'success');

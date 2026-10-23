@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use OpenAI\Laravel\Facades\OpenAI;
 
 class SubmissionController extends Controller
@@ -32,19 +33,43 @@ class SubmissionController extends Controller
     {
         $validated = $request->validate([
             'assignment_id' => 'required|integer|exists:assignments,id',
-            'student_response' => 'required|string',
+            'student_response' => 'required_without:answers|nullable|string',
+            'answers' => 'required_without:student_response|nullable|array|min:1',
+            'answers.*.question_id' => 'required_with:answers|integer',
+            'answers.*.response' => 'required_with:answers|string',
             'student_name' => 'nullable|string|max:255',
             'demo_id' => 'nullable|integer|exists:demos,id',
         ]);
 
-        $assignment = Assignment::query()->findOrFail($validated['assignment_id']);
+        $assignment = Assignment::query()->with('questions')->findOrFail($validated['assignment_id']);
 
         abort_if((bool) $assignment->created_by, 403);
 
+        $answersById = collect($validated['answers'] ?? [])
+            ->mapWithKeys(fn (array $answer): array => [
+                (int) $answer['question_id'] => trim($answer['response']),
+            ]);
+
+        if ($answersById->isNotEmpty()) {
+            foreach ($assignment->questions as $question) {
+                if (! filled($answersById->get($question->id))) {
+                    throw ValidationException::withMessages([
+                        'answers' => 'Please answer every question before submitting.',
+                    ]);
+                }
+            }
+        }
+
         try {
             $payload = [
-                'student_response' => $validated['student_response'],
+                'student_response' => filled($validated['student_response'] ?? null)
+                    ? $validated['student_response']
+                    : $this->formattedResponse($assignment, $answersById->all()),
             ];
+
+            if ($answersById->isNotEmpty()) {
+                $payload['answers'] = $answersById->all();
+            }
 
             if (filled($validated['student_name'] ?? null)) {
                 $payload['student_name'] = $validated['student_name'];
@@ -210,12 +235,16 @@ class SubmissionController extends Controller
                     ]),
                 ]);
 
+                $submission->refresh();
+                $submission->load('scores.criterion');
+
                 return response()->json([
                     'success' => true,
                     'message' => 'Assessment completed successfully',
                     'submission_id' => $submission->id,
                     'total_score' => $totalScore,
                     'max_score' => $assignment->overallMaxScore(),
+                    'question_grades' => $submission->questionGrades($assignment),
                     'scores' => $persistedScores,
                 ], 201);
             });
@@ -336,5 +365,27 @@ class SubmissionController extends Controller
         }
 
         return $data;
+    }
+
+    /**
+     * @param  array<int, string>  $answersByQuestionId
+     */
+    private function formattedResponse(Assignment $assignment, array $answersByQuestionId): string
+    {
+        $questions = $assignment->questions;
+
+        if ($questions->count() <= 1) {
+            $question = $questions->first();
+
+            return trim((string) ($answersByQuestionId[$question?->id] ?? ''));
+        }
+
+        return $questions
+            ->map(function (Question $question, int $index) use ($answersByQuestionId): string {
+                $answer = trim((string) ($answersByQuestionId[$question->id] ?? ''));
+
+                return ($index + 1).'. '.$question->prompt."\n\n".$answer;
+            })
+            ->implode("\n\n");
     }
 }

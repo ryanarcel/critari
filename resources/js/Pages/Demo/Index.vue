@@ -51,6 +51,9 @@ const saveRubric = (publish = false) => {
             if (res.data.data) {
                 wizard.assignment_id = res.data.data.assignment_id;
                 wizard.demo_id = res.data.data.demo_id;
+                if (Array.isArray(res.data.data.questions)) {
+                    wizard.syncPersistedQuestions(res.data.data.questions);
+                }
             }
 
             wizard.showModal(

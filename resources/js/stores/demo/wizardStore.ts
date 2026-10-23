@@ -27,12 +27,30 @@ export interface AssignmentQuestion {
     prompt: string;
 }
 
+export interface QuestionGradeScore {
+    criterion_name: string | null;
+    score: number | string | null;
+    feedback: string | null;
+}
+
+export interface QuestionGrade {
+    question_id: number | null;
+    prompt: string | null;
+    response: string;
+    score: number | string | null;
+    max_score: number | null;
+    overall_feedback: string | null;
+    scores: QuestionGradeScore[];
+}
+
 export interface WizardState {
     currentStep: number;
     title: string;
     question: string;
     questions?: AssignmentQuestion[];
-    studentAnswer: string;
+    studentAnswer?: string;
+    studentAnswers?: { [key: string]: string };
+    questionGrades?: QuestionGrade[];
     levels: Level[];
     criteria: CriterionCell[];
     aiScores: { [key: string]: number };
@@ -180,7 +198,14 @@ export const useWizardStore = defineStore('wizard', () => {
     ]);
 
     // Step 4: Student Response state
-    const studentAnswer = ref('');
+    const studentAnswers = ref<{ [key: string]: string }>({});
+    const questionGrades = ref<QuestionGrade[]>([]);
+    const studentAnswer = computed(() =>
+        questions.value
+            .map((item) => (studentAnswers.value[item.id] ?? '').trim())
+            .filter(Boolean)
+            .join('\n\n'),
+    );
     const sampleAnswers = {
         'narrative-essay': `The old oak tree in our backyard has stood for over fifty years, witnessing countless moments of our family's history. I remember climbing its branches as a child, feeling invincible among the rustling leaves. My grandmother would sit on the porch, watching me with a gentle smile, occasionally calling out warnings about being too adventurous. That tree represented freedom and security in equal measure—a place where I could escape the complexities of the world while remaining safely within sight of home.
 
@@ -264,7 +289,30 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
             return;
         }
 
-        questions.value.splice(idx, 1);
+        const [removed] = questions.value.splice(idx, 1);
+        if (removed) {
+            const nextAnswers = { ...studentAnswers.value };
+            delete nextAnswers[removed.id];
+            studentAnswers.value = nextAnswers;
+        }
+    };
+
+    const syncPersistedQuestions = (persisted: { id: number; prompt: string }[]) => {
+        const previous = questions.value.map((question) => ({
+            id: question.id,
+            answer: studentAnswers.value[question.id] ?? '',
+        }));
+
+        questions.value = persisted.map((question) => ({
+            id: String(question.id),
+            prompt: question.prompt,
+        }));
+
+        const nextAnswers: { [key: string]: string } = {};
+        questions.value.forEach((question, index) => {
+            nextAnswers[question.id] = previous[index]?.answer ?? '';
+        });
+        studentAnswers.value = nextAnswers;
     };
 
     // Validation methods
@@ -327,9 +375,16 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
 
             return true;
         } else if (step === 4) {
-            if (!studentAnswer.value.trim()) {
-                showModal('Missing Answer', 'Please enter a student response.', 'error');
-                return false;
+            for (let i = 0; i < questions.value.length; i++) {
+                const question = questions.value[i];
+                if (!(studentAnswers.value[question.id] ?? '').trim()) {
+                    showModal(
+                        'Missing Answer',
+                        `Please enter a response for question ${i + 1}.`,
+                        'error',
+                    );
+                    return false;
+                }
             }
             return true;
         }
@@ -363,7 +418,8 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
     const resetForm = () => {
         title.value = '';
         questions.value = [{ id: 'q-0', prompt: '' }];
-        studentAnswer.value = '';
+        studentAnswers.value = {};
+        questionGrades.value = [];
         levels.value = [
             { id: 'lvl-0', name: 'Needs Imp.', range: '0-4' },
             { id: 'lvl-1', name: 'Satisfactory', range: '5-6' },
@@ -414,28 +470,35 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
 
     // Set assessment results from AI grading
     const setAssessmentResults = (
-        scores: Array<{ criterion_name: string; score: number; feedback: string }>,
+        scores: Array<{
+            criterion_name: string;
+            score: number;
+            feedback: string;
+            question_id?: number | null;
+        }>,
         maxScoreFromAPI?: number,
+        grades: QuestionGrade[] = [],
     ) => {
         const scoresMap: { [key: string]: number } = {};
         const feedbackMap: { [key: string]: string } = {};
 
         scores.forEach((item) => {
-            // Find matching criterion by name
             const criterion = criteria.value.find((c) => c.name === item.criterion_name);
             if (criterion) {
-                scoresMap[criterion.id] = item.score;
-                feedbackMap[criterion.id] = item.feedback;
+                scoresMap[criterion.id] = (scoresMap[criterion.id] || 0) + Number(item.score);
+                feedbackMap[criterion.id] = [feedbackMap[criterion.id], item.feedback]
+                    .filter(Boolean)
+                    .join('\n\n');
             }
         });
 
         aiScores.value = scoresMap;
         aiFeedback.value = feedbackMap;
+        questionGrades.value = grades;
         if (maxScoreFromAPI !== undefined) {
             maxScore.value = maxScoreFromAPI;
         }
 
-        // Mark assessment as complete - enables full sidebar navigation
         assessmentComplete.value = true;
         saveState();
     };
@@ -450,6 +513,8 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
             question: question.value,
             questions: questions.value,
             studentAnswer: studentAnswer.value,
+            studentAnswers: studentAnswers.value,
+            questionGrades: questionGrades.value,
             levels: levels.value,
             criteria: criteria.value,
             aiScores: aiScores.value,
@@ -487,7 +552,17 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
                         },
                     ];
                 }
-                studentAnswer.value = state.studentAnswer;
+                if (state.studentAnswers && Object.keys(state.studentAnswers).length > 0) {
+                    studentAnswers.value = state.studentAnswers;
+                } else if (state.studentAnswer) {
+                    const firstQuestion = questions.value[0];
+                    studentAnswers.value = firstQuestion
+                        ? { [firstQuestion.id]: state.studentAnswer }
+                        : {};
+                } else {
+                    studentAnswers.value = {};
+                }
+                questionGrades.value = state.questionGrades ?? [];
                 levels.value = state.levels;
                 criteria.value = state.criteria;
                 aiScores.value = state.aiScores;
@@ -509,7 +584,7 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
             currentStep.value,
             title.value,
             questions.value,
-            studentAnswer.value,
+            studentAnswers.value,
             levels.value,
             criteria.value,
         ],
@@ -538,6 +613,8 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
         levels,
         criteria,
         studentAnswer,
+        studentAnswers,
+        questionGrades,
         sampleAnswers,
         aiScores,
         aiFeedback,
@@ -557,6 +634,7 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
         deleteLevel,
         addQuestion,
         deleteQuestion,
+        syncPersistedQuestions,
         validateStep,
         nextStep,
         prevStep,
