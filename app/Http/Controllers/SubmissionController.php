@@ -175,6 +175,7 @@ class SubmissionController extends Controller
                     $persistedScores[] = [
                         'question_id' => $questionId,
                         'criterion_id' => $criterion->id,
+                        'criterion_name' => $criterion->name,
                         'score' => $scoreData['score'],
                         'feedback' => $scoreData['feedback'] ?? '',
                     ];

@@ -161,7 +161,7 @@ const getAIRubricSuggestion = () => {
         >
             <div class="mx-auto flex max-w-full items-center justify-between">
                 <Link
-                    :href="route('demos.index')"
+                    :href="route('home')"
                     class="text-xl font-black tracking-tight text-white"
                 >
                     critari<span class="text-indigo-200">.</span>

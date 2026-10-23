@@ -303,7 +303,9 @@ class AssignmentGradingTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('success', true)
             ->assertJsonPath('total_score', 8)
-            ->assertJsonPath('max_score', 10);
+            ->assertJsonPath('max_score', 10)
+            ->assertJsonPath('scores.0.criterion_name', 'Idea explanation')
+            ->assertJsonPath('scores.0.score', 8);
 
         $tenant->run(function () use ($submissionId) {
             $submission = Submission::query()->with('scores.criterion')->find($submissionId);
@@ -427,7 +429,9 @@ class AssignmentGradingTest extends TestCase
             'submission_id' => $submissionId,
         ])
             ->assertCreated()
-            ->assertJsonPath('success', true);
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('scores.0.criterion_name', 'Idea explanation')
+            ->assertJsonPath('scores.0.score', 8);
 
         $tenant->run(function () use ($assignmentId, $submissionId) {
             $assignment = Assignment::query()->find($assignmentId);
