@@ -305,7 +305,15 @@ class SubmissionController extends Controller
     private function gradeResponseWithAi(Assignment $assignment, string $prompt, string $studentResponse): array
     {
         $criteriaList = $assignment->criteria
-            ->map(fn ($criterion) => "- {$criterion->name}")
+            ->map(function ($criterion) {
+                $line = "- {$criterion->name}";
+
+                if (filled($criterion->description)) {
+                    $line .= ": {$criterion->description}";
+                }
+
+                return $line;
+            })
             ->implode("\n");
 
         $levels = is_array($assignment->levels) ? $assignment->levels : json_decode($assignment->levels, true);
@@ -339,13 +347,13 @@ class SubmissionController extends Controller
                             {
                                 \"criterion_name\": \"Criterion Name\",
                                 \"score\": 7,
-                                \"feedback\": \"Specific feedback for this criterion\"
+                                \"feedback\": \"Reasoning for this score, citing evidence from the student response\"
                             }
                         ],
-                        \"overall_feedback\": \"General assessment summary\"
+                        \"overall_feedback\": \"Brief summary of the assessment\"
                     }
 
-                    Assign scores (0-{$maxScorePerCriterion}) for each criterion based on the performance levels provided above. Provide constructive feedback.";
+                    Assign scores (0-{$maxScorePerCriterion}) for each criterion based on the performance levels provided above. For each criterion, explain the reasoning for the score and cite specific evidence from the student response.";
 
         $response = OpenAI::chat()->create([
             'model' => 'gpt-4o-mini',

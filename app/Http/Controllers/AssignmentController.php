@@ -184,8 +184,9 @@ class AssignmentController extends Controller
         $assignment->load([
             'questions',
             'criteria',
+            'students' => fn ($query) => $query->orderBy('name'),
             'submissions' => fn ($query) => $query
-                ->whereNotNull('user_id')
+                ->visibleToTeacher()
                 ->with(['scores.criterion', 'user']),
         ]);
 
@@ -207,6 +208,10 @@ class AssignmentController extends Controller
                     'id' => $criterion->id,
                     'name' => $criterion->name,
                 ])->values(),
+                'students' => $assignment->students->map(fn ($student) => [
+                    'id' => $student->id,
+                    'name' => $student->name,
+                ])->values(),
                 'submissions' => $assignment->submissions->map(fn ($submission) => [
                     'id' => $submission->id,
                     'student_name' => $submission->user?->name
@@ -216,6 +221,10 @@ class AssignmentController extends Controller
                     'overall_feedback' => $submission->payload['overall_feedback'] ?? null,
                     'status' => $submission->status,
                     'score' => $submission->score,
+                    'source' => $submission->user_id ? 'app' : 'paper',
+                    'answered_count' => collect($submission->payload['answers'] ?? [])
+                        ->filter(fn ($text) => trim((string) $text) !== '')
+                        ->count(),
                     'submitted_at' => $submission->submitted_at,
                     'question_grades' => $submission->questionGrades($assignment),
                 ])->values(),

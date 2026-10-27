@@ -4,6 +4,7 @@ use App\Http\Controllers\AssignmentController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\SocialiteController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\PaperSubmissionController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\SubmissionController;
 use Illuminate\Support\Facades\Route;
@@ -26,6 +27,10 @@ Route::middleware([InitializeTenancyBySubdomain::class, PreventAccessFromCentral
             return Inertia::render('Demo/Index', ['sessionId' => $sessionId]);
         })->name('demos.session');
 
+        Route::post('/assignments/ai-rubric-suggestion', [AssignmentController::class, 'getAIRubricSuggestion'])
+            ->name('assignments.ai-rubric-suggestion');
+        Route::post('/assignments/ai-levels-suggestion', [AssignmentController::class, 'getAILevelsSuggestion'])
+            ->name('assignments.ai-levels-suggestion');
         Route::get('/assignments/create', [AssignmentController::class, 'create'])
             ->middleware('auth')
             ->name('assignments.create');
@@ -37,17 +42,20 @@ Route::middleware([InitializeTenancyBySubdomain::class, PreventAccessFromCentral
         Route::post('/submissions/{submission}/assess', [SubmissionController::class, 'processAIAssessment'])
             ->name('submissions.assess');
 
-        Route::post('/assignments/ai-rubric-suggestion', [AssignmentController::class, 'getAIRubricSuggestion'])
-            ->name('assignments.ai-rubric-suggestion');
-        Route::post('/assignments/ai-levels-suggestion', [AssignmentController::class, 'getAILevelsSuggestion'])
-            ->name('assignments.ai-levels-suggestion');
-
         // Dashboard requires authentication
         Route::middleware(['auth'])->group(function () {
             Route::post('/tenant/logout', [AuthenticatedSessionController::class, 'destroy'])
                 ->name('tenant.logout');
 
             Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+            Route::post('/assignments/{assignment}/paper-ocr', [PaperSubmissionController::class, 'ocrPhoto'])
+                ->name('assignments.paper-ocr');
+            Route::post('/assignments/{assignment}/paper-submissions', [PaperSubmissionController::class, 'store'])
+                ->name('assignments.paper-submissions.store');
+            Route::post('/assignments/{assignment}/paper-submissions/{submission}/ocr', [PaperSubmissionController::class, 'ocr'])
+                ->name('assignments.paper-submissions.ocr');
+            Route::put('/assignments/{assignment}/paper-submissions/{submission}', [PaperSubmissionController::class, 'update'])
+                ->name('assignments.paper-submissions.update');
             Route::get('/student', [StudentController::class, 'home'])->name('student.home');
             Route::post('/student/join', [StudentController::class, 'join'])->name('student.join');
             Route::get('/student/assignments/{assignment}', [StudentController::class, 'show'])

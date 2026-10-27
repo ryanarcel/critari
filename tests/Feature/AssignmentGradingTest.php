@@ -8,6 +8,7 @@ use App\Models\Demo;
 use App\Models\Question;
 use App\Models\Submission;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Inertia\Testing\AssertableInertia as Assert;
 use OpenAI\Laravel\Facades\OpenAI;
 use OpenAI\Responses\Chat\CreateResponse;
@@ -190,6 +191,7 @@ class AssignmentGradingTest extends TestCase
                 ->where('assignment.max_score', 10)
                 ->where('assignment.overall_max_score', 20)
                 ->has('assignment.submissions', 0)
+                ->has('assignment.students', 0)
             );
     }
 
@@ -306,7 +308,9 @@ class AssignmentGradingTest extends TestCase
             ->assertJsonPath('total_score', 8)
             ->assertJsonPath('max_score', 10)
             ->assertJsonPath('scores.0.criterion_name', 'Idea explanation')
-            ->assertJsonPath('scores.0.score', 8);
+            ->assertJsonPath('scores.0.score', 8)
+            ->assertJsonPath('question_grades.0.scores.0.feedback', 'Clear argument.')
+            ->assertJsonPath('question_grades.0.overall_feedback', 'Strong paper.');
 
         $tenant->run(function () use ($submissionId) {
             $submission = Submission::query()->with('scores.criterion')->find($submissionId);
@@ -594,5 +598,270 @@ class AssignmentGradingTest extends TestCase
                 ->where('submission.question_grades.0.score', 8)
                 ->where('submission.question_grades.1.score', 4)
             );
+    }
+
+    public function test_teacher_can_ocr_a_photo_before_choosing_a_student(): void
+    {
+        $tenant = $this->initializeTenant();
+        $teacher = User::factory()->create();
+        $assignmentId = $this->createAssignmentFor($teacher);
+        $questionId = $tenant->run(
+            fn () => Question::query()->where('assignment_id', $assignmentId)->value('id')
+        );
+
+        $this->fakeOcrResponse('The war began with the abduction of Helen.');
+
+        $this->actingAs($teacher)
+            ->post($this->tenantUrl('/assignments/'.$assignmentId.'/paper-ocr'), [
+                'question_id' => $questionId,
+                'image' => UploadedFile::fake()->image('paper.jpg', 40, 40),
+            ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('text', 'The war began with the abduction of Helen.');
+
+        $tenant->run(function () use ($assignmentId) {
+            $this->assertSame(0, Submission::query()->where('assignment_id', $assignmentId)->count());
+        });
+    }
+
+    public function test_teacher_can_create_a_walk_in_paper_from_ocr(): void
+    {
+        $tenant = $this->initializeTenant();
+        $teacher = User::factory()->create();
+        $assignmentId = $this->createAssignmentFor($teacher);
+        $questionId = $tenant->run(
+            fn () => Question::query()->where('assignment_id', $assignmentId)->value('id')
+        );
+
+        $this->fakeOcrResponse('The war began with the abduction of Helen.');
+
+        $this->actingAs($teacher)
+            ->post($this->tenantUrl('/assignments/'.$assignmentId.'/paper-ocr'), [
+                'question_id' => $questionId,
+                'image' => UploadedFile::fake()->image('paper.jpg', 40, 40),
+            ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('text', 'The war began with the abduction of Helen.');
+
+        $submissionId = $this->actingAs($teacher)
+            ->postJson($this->tenantUrl('/assignments/'.$assignmentId.'/paper-submissions'), [
+                'student_name' => 'Alex Kim',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('student_name', 'Alex Kim')
+            ->json('submission_id');
+
+        $this->actingAs($teacher)
+            ->putJson($this->tenantUrl('/assignments/'.$assignmentId.'/paper-submissions/'.$submissionId), [
+                'answers' => [
+                    [
+                        'question_id' => $questionId,
+                        'response' => 'The war began with the abduction of Helen.',
+                    ],
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->actingAs($teacher)
+            ->get($this->tenantUrl('/assignments/'.$assignmentId))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Assignments/Show')
+                ->has('assignment.submissions', 1)
+                ->where('assignment.submissions.0.student_name', 'Alex Kim')
+                ->where('assignment.submissions.0.source', 'paper')
+                ->where('assignment.submissions.0.answered_count', 1)
+            );
+    }
+
+    public function test_teacher_can_attach_a_photo_to_a_joined_student(): void
+    {
+        $tenant = $this->initializeTenant();
+        $teacher = User::factory()->create();
+        $student = User::factory()->student()->create(['name' => 'Jordan Lee']);
+        $assignmentId = $this->createAssignmentFor($teacher);
+        $submissionId = $this->joinAndSubmit(
+            $student,
+            $assignmentId,
+            'An in-app draft about Helen.'
+        );
+        $questionId = $tenant->run(
+            fn () => Question::query()->where('assignment_id', $assignmentId)->value('id')
+        );
+
+        $this->actingAs($teacher)
+            ->postJson($this->tenantUrl('/assignments/'.$assignmentId.'/paper-submissions'), [
+                'user_id' => $student->id,
+            ])
+            ->assertOk()
+            ->assertJsonPath('submission_id', $submissionId);
+
+        $this->actingAs($teacher)
+            ->putJson($this->tenantUrl('/assignments/'.$assignmentId.'/paper-submissions/'.$submissionId), [
+                'answers' => [
+                    [
+                        'question_id' => $questionId,
+                        'response' => 'The photographed paper replaces the typed answer.',
+                    ],
+                ],
+            ])
+            ->assertOk();
+
+        $this->actingAs($teacher)
+            ->get($this->tenantUrl('/assignments/'.$assignmentId))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Assignments/Show')
+                ->has('assignment.submissions', 1)
+                ->has('assignment.students', 1)
+                ->where('assignment.students.0.id', $student->id)
+                ->where('assignment.students.0.name', 'Jordan Lee')
+                ->where('assignment.submissions.0.student_name', 'Jordan Lee')
+                ->where('assignment.submissions.0.source', 'app')
+                ->where(
+                    'assignment.submissions.0.question_grades.0.response',
+                    'The photographed paper replaces the typed answer.'
+                )
+            );
+    }
+
+    public function test_students_cannot_create_paper_submissions(): void
+    {
+        $teacher = User::factory()->create();
+        $student = User::factory()->student()->create();
+        $assignmentId = $this->createAssignmentFor($teacher);
+
+        $this->actingAs($student)
+            ->postJson($this->tenantUrl('/assignments/'.$assignmentId.'/paper-submissions'), [
+                'student_name' => 'Alex Kim',
+            ])
+            ->assertNotFound();
+
+        $questionId = $this->initializeTenant()->run(
+            fn () => Question::query()->where('assignment_id', $assignmentId)->value('id')
+        );
+
+        $this->actingAs($student)
+            ->post($this->tenantUrl('/assignments/'.$assignmentId.'/paper-ocr'), [
+                'question_id' => $questionId,
+                'image' => UploadedFile::fake()->image('paper.jpg', 40, 40),
+            ], ['Accept' => 'application/json'])
+            ->assertNotFound();
+    }
+
+    public function test_other_teachers_cannot_create_paper_submissions(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $assignmentId = $this->createAssignmentFor($owner);
+
+        $this->actingAs($other)
+            ->postJson($this->tenantUrl('/assignments/'.$assignmentId.'/paper-submissions'), [
+                'student_name' => 'Alex Kim',
+            ])
+            ->assertNotFound();
+    }
+
+    public function test_paper_submission_is_graded_from_saved_text(): void
+    {
+        $tenant = $this->initializeTenant();
+        $teacher = User::factory()->create();
+        $assignmentId = $this->createAssignmentFor($teacher);
+        $questionId = $tenant->run(
+            fn () => Question::query()->where('assignment_id', $assignmentId)->value('id')
+        );
+
+        $submissionId = $this->actingAs($teacher)
+            ->postJson($this->tenantUrl('/assignments/'.$assignmentId.'/paper-submissions'), [
+                'student_name' => 'Alex Kim',
+            ])
+            ->assertCreated()
+            ->json('submission_id');
+
+        $this->actingAs($teacher)
+            ->putJson($this->tenantUrl('/assignments/'.$assignmentId.'/paper-submissions/'.$submissionId), [
+                'answers' => [
+                    [
+                        'question_id' => $questionId,
+                        'response' => 'The war began with the abduction of Helen.',
+                    ],
+                ],
+            ])
+            ->assertOk();
+
+        $this->fakeAssessmentResponse();
+
+        $this->actingAs($teacher)
+            ->postJson($this->tenantUrl('/submissions/'.$submissionId.'/assess'), [
+                'submission_id' => $submissionId,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('total_score', 8)
+            ->assertJsonPath('max_score', 10);
+    }
+
+    public function test_camera_first_paper_can_be_saved_and_graded(): void
+    {
+        $tenant = $this->initializeTenant();
+        $teacher = User::factory()->create();
+        $assignmentId = $this->createAssignmentFor($teacher);
+        $questionId = $tenant->run(
+            fn () => Question::query()->where('assignment_id', $assignmentId)->value('id')
+        );
+
+        $this->fakeOcrResponse('The war began with the abduction of Helen.');
+
+        $this->actingAs($teacher)
+            ->post($this->tenantUrl('/assignments/'.$assignmentId.'/paper-ocr'), [
+                'question_id' => $questionId,
+                'image' => UploadedFile::fake()->image('paper.jpg', 40, 40),
+            ], ['Accept' => 'application/json'])
+            ->assertOk();
+
+        $submissionId = $this->actingAs($teacher)
+            ->postJson($this->tenantUrl('/assignments/'.$assignmentId.'/paper-submissions'), [
+                'student_name' => 'Alex Kim',
+            ])
+            ->assertCreated()
+            ->json('submission_id');
+
+        $this->actingAs($teacher)
+            ->putJson($this->tenantUrl('/assignments/'.$assignmentId.'/paper-submissions/'.$submissionId), [
+                'answers' => [
+                    [
+                        'question_id' => $questionId,
+                        'response' => 'The war began with the abduction of Helen.',
+                    ],
+                ],
+            ])
+            ->assertOk();
+
+        $this->fakeAssessmentResponse();
+
+        $this->actingAs($teacher)
+            ->postJson($this->tenantUrl('/submissions/'.$submissionId.'/assess'), [
+                'submission_id' => $submissionId,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('total_score', 8);
+    }
+
+    private function fakeOcrResponse(string $text): void
+    {
+        OpenAI::fake([
+            CreateResponse::fake([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => $text,
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
     }
 }

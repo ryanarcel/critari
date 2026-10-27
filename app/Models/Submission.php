@@ -47,6 +47,14 @@ class Submission extends Model
         return $this->hasMany(CriterionScore::class);
     }
 
+    public function scopeVisibleToTeacher($query)
+    {
+        return $query->where(function ($inner) {
+            $inner->whereNotNull('user_id')
+                ->orWhere('payload->source', 'paper');
+        });
+    }
+
     public function answerFor(?int $questionId): string
     {
         $answers = $this->payload['answers'] ?? [];

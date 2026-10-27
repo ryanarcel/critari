@@ -8,6 +8,8 @@ use App\Models\Demo;
 use App\Models\Question;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
+use OpenAI\Laravel\Facades\OpenAI;
+use OpenAI\Responses\Chat\CreateResponse;
 use Tests\TestCase;
 
 class CreateAssignmentTest extends TestCase
@@ -54,7 +56,10 @@ class CreateAssignmentTest extends TestCase
         $this->actingAs($user)
             ->get($this->tenantUrl('/assignments/create'))
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->component('Assignments/Create'));
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Assignments/Create')
+                ->has('csrf_token')
+            );
     }
 
     public function test_guests_cannot_store_a_teacher_assignment(): void
@@ -185,5 +190,57 @@ class CreateAssignmentTest extends TestCase
                 $assignment->formattedPrompts()
             );
         });
+    }
+
+    public function test_teachers_can_request_ai_rubric_suggestions(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'teacher-ai-'.uniqid().'@example.com',
+        ]);
+
+        OpenAI::fake([
+            CreateResponse::fake([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                ['name' => 'Needs Imp.', 'range' => '0-4'],
+                                ['name' => 'Excellent', 'range' => '5-10'],
+                            ]),
+                        ],
+                    ],
+                ],
+            ]),
+            CreateResponse::fake([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'criteria' => [
+                                    [
+                                        'name' => 'Idea explanation',
+                                        'cells' => ['Little explanation', 'Thorough explanation'],
+                                    ],
+                                ],
+                            ]),
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
+
+        $this->actingAs($user)
+            ->postJson($this->tenantUrl('/assignments/ai-rubric-suggestion'), [
+                'question' => null,
+                'title' => 'An essay on the Trojan War',
+                'levels' => [
+                    ['name' => 'Needs Imp.', 'range' => '0-4'],
+                    ['name' => 'Excellent', 'range' => '5-10'],
+                ],
+                'num_criteria' => 1,
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('rubric.criteria.0.name', 'Idea explanation');
     }
 }

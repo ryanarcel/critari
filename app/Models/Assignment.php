@@ -77,6 +77,30 @@ class Assignment extends Model
     }
 
     /**
+     * @param  array<int|string, string>  $answersByQuestionId
+     */
+    public function formattedStudentResponse(array $answersByQuestionId): string
+    {
+        $questions = $this->relationLoaded('questions')
+            ? $this->questions
+            : $this->questions()->orderBy('order')->get();
+
+        if ($questions->count() <= 1) {
+            $question = $questions->first();
+
+            return trim((string) ($answersByQuestionId[$question?->id] ?? ''));
+        }
+
+        return $questions
+            ->map(function (Question $question, int $index) use ($answersByQuestionId): string {
+                $answer = trim((string) ($answersByQuestionId[$question->id] ?? ''));
+
+                return ($index + 1).'. '.$question->prompt."\n\n".$answer;
+            })
+            ->implode("\n\n");
+    }
+
+    /**
      * @return BelongsTo<Demo, $this>
      */
     public function demo(): BelongsTo

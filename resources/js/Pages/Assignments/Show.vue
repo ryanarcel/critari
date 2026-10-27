@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
+import PaperCapturePanel from '@/Components/PaperCapturePanel.vue';
 
 interface Score {
     criterion_name: string | null;
@@ -25,6 +26,8 @@ interface Paper {
     overall_feedback: string | null;
     status: string;
     score: number | string | null;
+    source: 'app' | 'paper';
+    answered_count: number;
     submitted_at: string | null;
     question_grades: QuestionGrade[];
 }
@@ -37,6 +40,7 @@ interface AssignmentShow {
     overall_max_score: number | null;
     questions: { id: number; prompt: string }[];
     criteria: { id: number; name: string }[];
+    students: { id: number; name: string }[];
     submissions: Paper[];
 }
 
@@ -50,6 +54,37 @@ const errorMessage = ref('');
 const gradingId = ref<number | null>(null);
 const expandedId = ref<number | null>(null);
 const copied = ref(false);
+const fileInput = ref<HTMLInputElement | null>(null);
+const captureOpen = ref(false);
+const photoFile = ref<File | null>(null);
+const photoKey = ref(0);
+
+const openCamera = () => {
+    fileInput.value?.click();
+};
+
+const onPhotoChosen = (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+
+    if (!file) {
+        return;
+    }
+
+    photoFile.value = file;
+    photoKey.value += 1;
+    captureOpen.value = true;
+};
+
+const closeCapture = () => {
+    captureOpen.value = false;
+    photoFile.value = null;
+};
+
+const paperSaved = () => {
+    router.reload({ only: ['assignment'] });
+};
 
 const formatScore = (value: number | string | null) => {
     if (value === null || value === '') {
@@ -195,20 +230,69 @@ const logout = () => {
             </p>
 
             <section class="rounded-lg bg-white p-6 shadow-sm">
-                <h2 class="text-lg font-semibold text-slate-900">Student papers</h2>
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h2 class="text-lg font-semibold text-slate-900">Student papers</h2>
+                        <p class="mt-1 text-sm text-slate-500">
+                            Students can type in the app, or you can photograph a paper.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        class="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500"
+                        @click="openCamera"
+                    >
+                        Photograph a paper
+                    </button>
+                    <input
+                        id="paper-photo"
+                        ref="fileInput"
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        class="hidden"
+                        @change="onPhotoChosen"
+                    />
+                </div>
+
+                <PaperCapturePanel
+                    v-if="captureOpen"
+                    :assignment-id="assignment.id"
+                    :questions="assignment.questions"
+                    :students="assignment.students"
+                    :overall-max-score="assignment.overall_max_score"
+                    :photo="photoFile"
+                    :photo-key="photoKey"
+                    @capture="openCamera"
+                    @closed="closeCapture"
+                    @graded="paperSaved"
+                />
+
                 <p v-if="assignment.submissions.length === 0" class="mt-3 text-sm text-slate-500">
-                    No student papers yet. Share the code so students can join and submit.
+                    No student papers yet. Share the code so students can join and submit, or
+                    photograph a paper.
                 </p>
                 <ul v-else class="mt-4 divide-y divide-slate-200">
                     <li v-for="paper in assignment.submissions" :key="paper.id" class="py-4">
                         <div class="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                                <p class="font-medium text-slate-900">{{ paper.student_name }}</p>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <p class="font-medium text-slate-900">{{ paper.student_name }}</p>
+                                    <span
+                                        class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-slate-600"
+                                    >
+                                        {{ paper.source === 'paper' ? 'Paper' : 'App' }}
+                                    </span>
+                                </div>
                                 <p class="text-sm text-slate-500">
                                     <span class="capitalize">{{ paper.status }}</span>
                                     <span v-if="paper.status === 'graded' && paper.score !== null">
                                         · {{ formatScore(paper.score) }} /
                                         {{ assignment.overall_max_score }}
+                                    </span>
+                                    <span v-if="assignment.questions.length > 0">
+                                        · {{ paper.answered_count }} of
+                                        {{ assignment.questions.length }} questions captured
                                     </span>
                                 </p>
                             </div>
@@ -281,7 +365,8 @@ const logout = () => {
                                             {{ formatScore(score.score) }}
                                         </p>
                                     </div>
-                                    <p v-if="score.feedback" class="mt-2 text-sm text-slate-600">
+                                    <p v-if="score.feedback" class="mt-2 text-sm leading-relaxed text-slate-600">
+                                        <span class="font-medium text-slate-500">Reasoning. </span>
                                         {{ score.feedback }}
                                     </p>
                                 </div>

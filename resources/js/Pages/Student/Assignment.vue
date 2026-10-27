@@ -189,7 +189,8 @@ const logout = () => {
                                 {{ formatScore(score.score) }}
                             </p>
                         </div>
-                        <p v-if="score.feedback" class="mt-2 text-sm text-slate-600">
+                        <p v-if="score.feedback" class="mt-2 text-sm leading-relaxed text-slate-600">
+                            <span class="font-medium text-slate-500">Reasoning. </span>
                             {{ score.feedback }}
                         </p>
                     </div>
