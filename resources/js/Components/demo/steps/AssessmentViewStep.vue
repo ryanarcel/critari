@@ -3,7 +3,7 @@
         <section
             v-for="(grade, gradeIndex) in displayedGrades"
             :key="grade.question_id ?? `paper-${gradeIndex}`"
-            class="rounded-xl border border-slate-100 bg-white p-8 shadow-sm"
+            class="rounded-xl border border-slate-100 bg-white p-4 shadow-sm sm:p-8"
         >
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <h3 class="text-sm font-semibold text-slate-800">

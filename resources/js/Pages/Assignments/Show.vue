@@ -143,9 +143,9 @@ const logout = () => {
 
     <div class="min-h-screen bg-slate-50">
         <header class="border-b border-slate-200 bg-white shadow-sm">
-            <div class="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
-                <div class="flex items-center space-x-8">
-                    <Link href="/" class="text-xl font-black tracking-tight text-slate-900">
+            <div class="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
+                <div class="flex min-w-0 items-center gap-4 sm:gap-8">
+                    <Link href="/" class="shrink-0 text-xl font-black tracking-tight text-slate-900">
                         critari<span class="text-indigo-600">.</span>
                     </Link>
                     <Link
@@ -155,11 +155,13 @@ const logout = () => {
                         Dashboard
                     </Link>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <span class="text-sm text-slate-600">{{ user.name }}</span>
+                <div class="flex items-center gap-3 sm:gap-4">
+                    <span class="hidden max-w-[8rem] truncate text-sm text-slate-600 sm:inline">{{
+                        user.name
+                    }}</span>
                     <button
                         type="button"
-                        class="text-sm font-medium text-slate-600 hover:text-slate-900"
+                        class="min-h-11 text-sm font-medium text-slate-600 hover:text-slate-900"
                         @click="logout"
                     >
                         Sign out
@@ -168,11 +170,11 @@ const logout = () => {
             </div>
         </header>
 
-        <main class="mx-auto max-w-5xl space-y-8 px-4 py-10 sm:px-6">
-            <div class="flex flex-wrap items-start justify-between gap-4">
+        <main class="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:space-y-8 sm:px-6 sm:py-10">
+            <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
                 <div>
                     <p class="text-sm text-slate-500">Assignment</p>
-                    <h1 class="mt-1 text-3xl font-bold text-slate-900">{{ assignment.title }}</h1>
+                    <h1 class="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl">{{ assignment.title }}</h1>
                 </div>
                 <div
                     v-if="assignment.join_code"
@@ -199,7 +201,7 @@ const logout = () => {
                 </div>
             </div>
 
-            <section class="rounded-lg bg-white p-6 shadow-sm">
+            <section class="rounded-lg bg-white p-4 shadow-sm sm:p-6">
                 <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">
                     Questions
                 </h2>
@@ -229,8 +231,8 @@ const logout = () => {
                 {{ errorMessage }}
             </p>
 
-            <section class="rounded-lg bg-white p-6 shadow-sm">
-                <div class="flex flex-wrap items-start justify-between gap-3">
+            <section class="rounded-lg bg-white p-4 shadow-sm sm:p-6">
+                <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
                     <div>
                         <h2 class="text-lg font-semibold text-slate-900">Student papers</h2>
                         <p class="mt-1 text-sm text-slate-500">
@@ -239,7 +241,7 @@ const logout = () => {
                     </div>
                     <button
                         type="button"
-                        class="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500"
+                        class="min-h-11 w-full rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 sm:w-auto"
                         @click="openCamera"
                     >
                         Photograph a paper
@@ -296,10 +298,10 @@ const logout = () => {
                                     </span>
                                 </p>
                             </div>
-                            <div class="flex items-center gap-3">
+                            <div class="flex w-full items-center gap-3 sm:w-auto">
                                 <button
                                     type="button"
-                                    class="text-sm font-medium text-slate-600 hover:text-slate-900"
+                                    class="min-h-11 text-sm font-medium text-slate-600 hover:text-slate-900"
                                     @click="expandedId = expandedId === paper.id ? null : paper.id"
                                 >
                                     {{ expandedId === paper.id ? 'Hide' : 'View' }}
@@ -307,7 +309,7 @@ const logout = () => {
                                 <button
                                     type="button"
                                     :disabled="gradingId !== null"
-                                    class="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                    class="min-h-11 flex-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
                                     @click="gradePaper(paper)"
                                 >
                                     {{

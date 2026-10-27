@@ -9,7 +9,7 @@
     >
         <div
             v-if="wizard.isModalOpen"
-            class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center"
+            class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
             @click="wizard.closeModal"
         >
             <!-- Modal Content -->
@@ -23,7 +23,7 @@
             >
                 <div
                     v-if="wizard.isModalOpen"
-                    class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4"
+                    class="w-full max-w-md rounded-t-lg bg-white p-6 shadow-xl sm:mx-4 sm:rounded-lg"
                     @click.stop
                 >
                     <!-- Icon -->

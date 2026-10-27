@@ -1,5 +1,5 @@
 <template>
-    <div class="bg-white border border-slate-100 rounded-xl p-12 shadow-sm text-center">
+    <div class="rounded-xl border border-slate-100 bg-white p-6 text-center shadow-sm sm:p-12">
         <div class="space-y-4">
             <div
                 class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto"

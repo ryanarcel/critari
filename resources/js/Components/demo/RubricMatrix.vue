@@ -1,29 +1,32 @@
 <template>
-    <div class="bg-white border border-slate-100 rounded-xl shadow overflow-hidden">
-        <div class="flex items-center justify-between p-6 border-b bg-slate-50">
-            <div class="flex items-center gap-3">
+    <div class="overflow-hidden rounded-xl border border-slate-100 bg-white shadow">
+        <div
+            class="flex flex-col gap-3 border-b bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6"
+        >
+            <div class="flex flex-wrap items-center gap-3">
                 <div class="text-sm font-semibold text-slate-700">Rubric Matrix</div>
                 <span class="text-xs text-slate-500">Manage levels and criteria</span>
             </div>
-            <div class="flex items-center gap-2">
-                <button
-                    type="button"
-                    class="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-slate-100 border border-slate-200 text-sm text-slate-700 hover:bg-slate-200 transition transform active:scale-95"
-                    @click.prevent="wizard.addLevel"
-                >
-                    <PlusIcon class="w-4 h-4 text-slate-600" />
-                    <span class="font-medium">Add Level</span>
-                </button>
-            </div>
+            <button
+                type="button"
+                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-200 active:scale-95"
+                @click.prevent="wizard.addLevel"
+            >
+                <PlusIcon class="h-4 w-4 text-slate-600" />
+                <span class="font-medium">Add Level</span>
+            </button>
         </div>
 
-        <div class="p-6">
+        <div class="p-4 sm:p-6">
+            <p class="mb-3 text-xs text-slate-500 lg:hidden">
+                Swipe sideways to see every level.
+            </p>
             <div class="overflow-x-auto">
                 <table
                     :class="
                         wizard.levels.length >= 6
                             ? 'min-w-[1200px] table-fixed border-collapse'
-                            : 'w-full table-fixed border-collapse'
+                            : 'min-w-[640px] w-full table-fixed border-collapse sm:min-w-0'
                     "
                     class="bg-white"
                 >
@@ -105,18 +108,18 @@
                 </table>
             </div>
 
-            <div class="mt-6 flex items-center justify-between">
+            <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <button
                     type="button"
-                    class="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-white border border-slate-200 text-sm text-slate-700 hover:bg-slate-50"
+                    class="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                     @click.prevent="wizard.addCriteria"
                 >
-                    <PlusIcon class="w-4 h-4" />
+                    <PlusIcon class="h-4 w-4" />
                     <span>Add Criteria (Row)</span>
                 </button>
                 <button
                     type="button"
-                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-neutral-100 border border-indigo-500 text-indigo-600 hover:bg-indigo-50 transition duration-150 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-indigo-500 bg-neutral-100 px-4 py-2 text-sm font-medium text-indigo-600 transition duration-150 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
                     :disabled="wizard.isLoadingAI"
                     @click.prevent="emit('ai-suggest')"
                 >
@@ -131,8 +134,8 @@
         </div>
 
         <!-- Summary stats -->
-        <div class="p-6 border-t bg-slate-50">
-            <div class="flex items-center justify-between">
+        <div class="border-t bg-slate-50 p-4 sm:p-6">
+            <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="flex items-center gap-3 text-sm text-slate-700">
                     <div class="bg-white p-2 rounded-full border border-slate-200">
                         <CheckIcon class="w-4 h-4 text-indigo-600" />

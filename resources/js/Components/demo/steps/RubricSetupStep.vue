@@ -1,7 +1,7 @@
 <template>
     <div class="space-y-6">
         <!-- Title Section -->
-        <div class="bg-white border border-slate-100 rounded-xl p-8 shadow-sm">
+        <div class="rounded-xl border border-slate-100 bg-white p-4 shadow-sm sm:p-8">
             <div class="space-y-6">
                 <div>
                     <label for="title" class="block text-sm font-semibold text-slate-700 mb-3"

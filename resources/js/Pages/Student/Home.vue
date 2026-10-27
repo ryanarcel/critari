@@ -58,15 +58,15 @@ const logout = () => {
 
     <div class="min-h-screen bg-slate-50">
         <header class="border-b border-slate-200 bg-white">
-            <div class="mx-auto flex max-w-3xl items-center justify-between px-4 py-4">
+            <div class="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3 sm:py-4">
                 <Link href="/" class="text-xl font-black tracking-tight text-slate-900">
                     critari<span class="text-indigo-600">.</span>
                 </Link>
                 <div class="flex items-center space-x-4">
-                    <span v-if="user.name" class="text-sm text-slate-600">{{ user.name }}</span>
+                    <span v-if="user.name" class="hidden max-w-[8rem] truncate text-sm text-slate-600 sm:inline">{{ user.name }}</span>
                     <button
                         type="button"
-                        class="text-sm font-medium text-slate-600 hover:text-slate-900"
+                        class="min-h-11 text-sm font-medium text-slate-600 hover:text-slate-900"
                         @click="logout"
                     >
                         Sign out
@@ -75,7 +75,7 @@ const logout = () => {
             </div>
         </header>
 
-        <main class="mx-auto max-w-3xl space-y-8 px-4 py-10">
+        <main class="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:space-y-8 sm:py-10">
             <p v-if="status" class="rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
                 {{ status }}
             </p>
@@ -95,13 +95,13 @@ const logout = () => {
                         v-model="form.code"
                         type="text"
                         autocomplete="off"
-                        class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm uppercase tracking-widest text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        class="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm uppercase tracking-widest text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         placeholder="ABC123"
                     />
                     <button
                         type="submit"
                         :disabled="form.processing || form.code.trim() === ''"
-                        class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        class="min-h-11 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {{ form.processing ? 'Joining...' : 'Join' }}
                     </button>
@@ -136,7 +136,7 @@ const logout = () => {
                             </div>
                             <Link
                                 :href="route('student.assignments.show', assignment.id)"
-                                class="text-sm font-medium text-slate-600 hover:text-slate-900"
+                                class="min-h-11 text-sm font-medium text-slate-600 hover:text-slate-900"
                             >
                                 Open
                             </Link>

@@ -53,6 +53,7 @@ const submit = () => {
 
             <div class="mt-4 flex items-center justify-end">
                 <PrimaryButton
+                    class="w-full sm:w-auto"
                     :class="{ 'opacity-25': form.processing }"
                     :disabled="form.processing"
                 >

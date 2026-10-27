@@ -3,7 +3,7 @@
         <section
             v-for="(item, index) in wizard.questions"
             :key="item.id"
-            class="rounded-xl border border-slate-100 bg-white p-8 shadow-sm"
+            class="rounded-xl border border-slate-100 bg-white p-4 shadow-sm sm:p-8"
         >
             <label
                 :for="`student-answer-${item.id}`"

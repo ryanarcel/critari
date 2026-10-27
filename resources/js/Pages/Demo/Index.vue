@@ -157,20 +157,32 @@ const getAIRubricSuggestion = () => {
 <template>
     <Head title="Rubric Editor — Critari" />
 
-    <div class="flex flex-col min-h-screen text-slate-900">
+    <div class="flex min-h-dvh flex-col overflow-x-hidden text-slate-900">
         <!-- Nav -->
         <nav
-            class="sticky top-0 z-50 border-b border-indigo-700 bg-indigo-600 px-6 py-4 backdrop-blur-xl"
+            class="sticky top-0 z-50 border-b border-indigo-700 bg-indigo-600 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-xl sm:px-6 sm:py-4"
         >
-            <div class="mx-auto flex max-w-full items-center justify-between">
+            <div class="mx-auto flex max-w-full items-center justify-between gap-2">
                 <Link
                     :href="route('home')"
-                    class="text-xl font-black tracking-tight text-white"
+                    class="shrink-0 text-xl font-black tracking-tight text-white"
                 >
                     critari<span class="text-indigo-200">.</span>
                 </Link>
 
-                <div class="flex items-center space-x-4">
+                <div class="flex min-w-0 items-center gap-2 sm:gap-3">
+                    <button
+                        type="button"
+                        class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-indigo-400 bg-indigo-700 px-3 text-xs font-bold uppercase tracking-wider text-white hover:bg-indigo-800"
+                        :aria-expanded="wizard.sidebarOpen"
+                        aria-controls="workflow-sidebar"
+                        @click="wizard.toggleSidebar"
+                    >
+                        <span>{{ wizard.sidebarOpen ? 'Hide' : 'Steps' }}</span>
+                        <span class="font-mono normal-case tracking-normal">
+                            {{ wizard.currentStep }}/{{ wizard.totalSteps }}
+                        </span>
+                    </button>
                     <template v-if="user">
                         <Link
                             :href="route('dashboard')"
@@ -188,7 +200,7 @@ const getAIRubricSuggestion = () => {
                         </Link>
                         <Link
                             :href="route('register')"
-                            class="rounded-lg border border-indigo-400 bg-indigo-700 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-indigo-800"
+                            class="hidden rounded-lg border border-indigo-400 bg-indigo-700 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-indigo-800 sm:inline-flex"
                         >
                             Get Started
                         </Link>
@@ -198,17 +210,17 @@ const getAIRubricSuggestion = () => {
         </nav>
 
         <!-- Main Content + Sidebar Container -->
-        <div class="flex flex-1">
+        <div class="flex min-w-0 flex-1">
             <!-- Left: Main Content Area -->
-            <div class="flex-1 overflow-y-auto">
-                <div class="w-full px-6 py-10">
+            <div class="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
+                <div class="w-full px-4 py-6 sm:px-6 sm:py-10">
                     <!-- Step Header -->
-                    <header class="mb-8 max-w-6xl mx-auto">
+                    <header class="mx-auto mb-6 max-w-6xl sm:mb-8">
                         <div class="mb-4">
-                            <h1 class="text-3xl font-bold text-slate-900">
+                            <h1 class="text-2xl font-bold text-slate-900 sm:text-3xl">
                                 {{ wizard.currentStepData.name }}
                             </h1>
-                            <p class="text-slate-500 mt-2">
+                            <p class="mt-2 text-slate-500">
                                 {{ wizard.currentStepData.description }}
                             </p>
                         </div>

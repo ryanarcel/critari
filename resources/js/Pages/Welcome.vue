@@ -33,9 +33,9 @@ const generateSessionId = () => {
 
         <!-- Nav -->
         <nav
-            class="sticky top-0 z-50 border-b border-indigo-700 bg-indigo-600 px-6 py-4 backdrop-blur-xl"
+            class="sticky top-0 z-50 border-b border-indigo-700 bg-indigo-600 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-xl sm:px-6 sm:py-4"
         >
-            <div class="mx-auto flex max-w-7xl items-center justify-between">
+            <div class="mx-auto flex max-w-7xl items-center justify-between gap-3">
                 <span class="text-xl font-black tracking-tight text-white">
                     critari<span class="text-indigo-200">.</span>
                 </span>
@@ -52,7 +52,7 @@ const generateSessionId = () => {
                     <template v-else>
                         <button
                             type="button"
-                            class="text-xs font-bold uppercase tracking-wider text-indigo-100 transition-colors hover:text-white"
+                            class="min-h-11 text-xs font-bold uppercase tracking-wider text-indigo-100 transition-colors hover:text-white"
                             @click="showLoginModal = true"
                         >
                             Sign In
@@ -63,18 +63,16 @@ const generateSessionId = () => {
         </nav>
 
         <!-- Hero -->
-        <header class="relative z-10 mx-auto max-w-6xl px-6 pb-24 pt-28 text-center">
+        <header class="relative z-10 mx-auto max-w-6xl px-4 pb-16 pt-16 text-center sm:px-6 sm:pb-24 sm:pt-28">
             <div
                 class="mb-8 inline-flex items-center space-x-2 rounded-full border border-slate-800/80 bg-slate-900 px-4 py-1.5 text-xs font-medium text-slate-400 shadow-xl"
             >
                 <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-500"></span>
-                <span class="font-mono text-slate-300"
-                    >Pedagogical Evaluation Assistant Active</span
-                >
+                <span class="font-mono text-slate-300">AI grading assistant</span>
             </div>
 
             <h1
-                class="mx-auto mb-6 max-w-4xl text-4xl font-extrabold leading-[1.15] tracking-tight text-slate-900 sm:text-6xl"
+                class="mx-auto mb-6 max-w-4xl text-3xl font-extrabold leading-[1.15] tracking-tight text-slate-900 sm:text-6xl"
             >
                 End Teacher Burnout with
                 <span
@@ -104,14 +102,14 @@ const generateSessionId = () => {
             >
                 <Link
                     :href="route('demos.session', { sessionId: generateSessionId() })"
-                    class="w-full rounded-xl bg-indigo-600 px-8 py-4 text-center text-sm font-bold tracking-wide text-white shadow-lg shadow-indigo-600/20 transition-all hover:bg-indigo-500 sm:w-auto"
+                    class="min-h-11 w-full rounded-xl bg-indigo-600 px-8 py-4 text-center text-sm font-bold tracking-wide text-white shadow-lg shadow-indigo-600/20 transition-all hover:bg-indigo-500 sm:w-auto"
                 >
                     Try the demo
                 </Link>
                 <a
                     href="https://github.com/ryanarcel/critari"
                     target="_blank"
-                    class="w-full rounded-xl border border-slate-800/80 bg-slate-900 px-8 py-4 text-center text-sm font-bold tracking-wide text-slate-300 transition-all hover:bg-slate-800/80 sm:w-auto"
+                    class="min-h-11 w-full rounded-xl border border-slate-800/80 bg-slate-900 px-8 py-4 text-center text-sm font-bold tracking-wide text-slate-300 transition-all hover:bg-slate-800/80 sm:w-auto"
                 >
                     Source Repository
                 </a>
@@ -119,7 +117,7 @@ const generateSessionId = () => {
         </header>
 
         <!-- Footnote -->
-        <footer class="relative z-10 mx-auto max-w-6xl px-6 py-12 text-center">
+        <footer class="relative z-10 mx-auto max-w-6xl px-4 py-12 text-center sm:px-6">
             <p class="text-sm text-slate-400">
                 <span class="font-semibold text-slate-300">Note:</span> This website is still in progress. However, you can
                 <Link

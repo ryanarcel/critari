@@ -406,11 +406,29 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
         }
     };
 
+    const sidebarOpen = ref(false);
+
+    const isWideLayout = () =>
+        typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
+
+    const toggleSidebar = () => {
+        sidebarOpen.value = !sidebarOpen.value;
+    };
+
+    const closeSidebar = () => {
+        sidebarOpen.value = false;
+    };
+
+    const closeSidebarOnMobile = () => {
+        if (!isWideLayout()) {
+            sidebarOpen.value = false;
+        }
+    };
+
     const goToStep = (step: number) => {
-        // If assessment is complete, allow full navigation between all steps
-        // Otherwise, only allow backward navigation (to steps already visited)
         if (assessmentComplete.value || step <= currentStep.value) {
             currentStep.value = step;
+            closeSidebarOnMobile();
         }
     };
 
@@ -625,7 +643,11 @@ Today, when I stand before that tree, I see not just wood and leaves, but a repo
         demo_id,
         submission_id,
         assessmentComplete,
+        sidebarOpen,
         // Methods
+        toggleSidebar,
+        closeSidebar,
+        closeSidebarOnMobile,
         showModal,
         closeModal,
         addCriteria,

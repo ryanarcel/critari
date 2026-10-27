@@ -43,6 +43,7 @@ const page = usePage();
 const props = computed(() => page.props as DashboardProps);
 const selectedPeriod = ref('Period 2');
 const showUserMenu = ref(false);
+const showMobileNav = ref(false);
 
 const getStatusColor = (status: string) => {
     switch (status) {
@@ -68,15 +69,13 @@ const handleLogout = () => {
     <div class="min-h-screen bg-slate-50">
         <!-- Header -->
         <header class="border-b border-slate-200 bg-white shadow-sm">
-            <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-                <div class="flex items-center justify-between">
-                    <!-- Logo -->
-                    <div class="flex items-center space-x-8">
-                        <Link href="/" class="text-xl font-black tracking-tight text-slate-900">
+            <div class="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex min-w-0 items-center space-x-8">
+                        <Link href="/" class="shrink-0 text-xl font-black tracking-tight text-slate-900">
                             critari<span class="text-indigo-600">.</span>
                         </Link>
 
-                        <!-- Navigation -->
                         <nav class="hidden space-x-6 md:flex">
                             <Link
                                 href="/dashboard"
@@ -105,68 +104,111 @@ const handleLogout = () => {
                         </nav>
                     </div>
 
-                    <!-- Period Selector & Avatar -->
-                    <div class="flex items-center space-x-4">
-                        <div class="flex items-center space-x-2">
-                            <button
-                                class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                    <div class="flex items-center gap-2 sm:gap-4">
+                        <button
+                            type="button"
+                            class="hidden rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 sm:inline-flex"
+                        >
+                            {{ selectedPeriod }}
+                            <svg
+                                class="ml-1 inline h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
                             >
-                                {{ selectedPeriod }}
-                                <svg
-                                    class="ml-1 inline h-4 w-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M19 14l-7 7m0 0l-7-7m7 7V3"
-                                    ></path>
-                                </svg>
-                            </button>
-                        </div>
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                                ></path>
+                            </svg>
+                        </button>
 
-                        <!-- User Avatar & Menu -->
                         <div class="relative">
                             <button
+                                type="button"
+                                class="flex h-11 w-11 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white"
                                 @click="showUserMenu = !showUserMenu"
-                                class="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white transition-transform hover:scale-110"
                             >
                                 {{ props.user.avatar }}
                             </button>
 
-                            <!-- Dropdown Menu -->
                             <div
                                 v-show="showUserMenu"
                                 class="absolute right-0 top-12 z-10 w-48 rounded-lg border border-slate-200 bg-white shadow-lg"
                             >
                                 <Link
                                     href="/profile"
-                                    class="block px-4 py-2 text-sm text-slate-700 transition-colors hover:bg-slate-50"
+                                    class="block min-h-11 px-4 py-3 text-sm text-slate-700 transition-colors hover:bg-slate-50"
                                 >
                                     Profile
                                 </Link>
                                 <button
+                                    type="button"
+                                    class="min-h-11 w-full px-4 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50"
                                     @click="handleLogout"
-                                    class="w-full px-4 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50"
                                 >
                                     Logout
                                 </button>
                             </div>
                         </div>
+
+                        <button
+                            type="button"
+                            class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 md:hidden"
+                            :aria-expanded="showMobileNav"
+                            aria-label="Open menu"
+                            @click="showMobileNav = !showMobileNav"
+                        >
+                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path
+                                    v-if="!showMobileNav"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M4 6h16M4 12h16M4 18h16"
+                                />
+                                <path
+                                    v-else
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M6 18L18 6M6 6l12 12"
+                                />
+                            </svg>
+                        </button>
                     </div>
                 </div>
+
+                <nav v-if="showMobileNav" class="mt-3 space-y-1 border-t border-slate-200 pt-3 md:hidden">
+                    <Link
+                        href="/dashboard"
+                        class="block min-h-11 rounded-md px-3 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                        Dashboard
+                    </Link>
+                    <Link
+                        :href="route('assignments.create')"
+                        class="block min-h-11 rounded-md px-3 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                        Create assignment
+                    </Link>
+                    <Link
+                        href="/profile"
+                        class="block min-h-11 rounded-md px-3 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                        Profile
+                    </Link>
+                </nav>
             </div>
         </header>
 
         <!-- Main Content -->
-        <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-            <!-- Welcome Section -->
-            <div class="mb-8 flex items-center justify-between">
+        <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+            <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h1 class="text-3xl font-bold text-slate-900">
+                    <h1 class="text-2xl font-bold text-slate-900 sm:text-3xl">
                         Welcome back, {{ props.user.name }}! 👋
                     </h1>
                     <p class="mt-1 text-slate-600">
@@ -174,10 +216,10 @@ const handleLogout = () => {
                     </p>
                 </div>
 
-                                <Link
-                                :href="route('assignments.create')"
-                                class="rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-bold text-white transition-all hover:bg-indigo-500"
-                            >
+                <Link
+                    :href="route('assignments.create')"
+                    class="inline-flex min-h-11 items-center justify-center rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-bold text-white transition-all hover:bg-indigo-500"
+                >
                     + Create New Assignment
                 </Link>
             </div>
@@ -216,7 +258,48 @@ const handleLogout = () => {
                 </div>
 
                 <div class="overflow-hidden rounded-lg bg-white shadow-sm">
-                    <div class="overflow-x-auto">
+                    <ul class="divide-y divide-slate-200 md:hidden">
+                        <li
+                            v-for="assignment in props.assignments"
+                            :key="`mobile-${assignment.id}`"
+                            class="p-4"
+                        >
+                            <Link
+                                :href="route('assignments.show', assignment.id)"
+                                class="text-sm font-medium text-indigo-600"
+                            >
+                                {{ assignment.title }}
+                            </Link>
+                            <p
+                                v-if="assignment.join_code"
+                                class="mt-1 font-mono text-xs tracking-widest text-slate-400"
+                            >
+                                {{ assignment.join_code }}
+                            </p>
+                            <p class="mt-2 text-sm text-slate-600">
+                                {{ assignment.class || 'No class' }} ·
+                                {{ assignment.submissions_completed }} /
+                                {{ assignment.submissions_total }} submitted
+                            </p>
+                            <div class="mt-3 flex items-center justify-between gap-3">
+                                <span
+                                    :class="[
+                                        'inline-block rounded-full px-3 py-1 text-xs font-semibold',
+                                        getStatusColor(assignment.status),
+                                    ]"
+                                >
+                                    {{ assignment.status }}
+                                </span>
+                                <Link
+                                    :href="route('assignments.show', assignment.id)"
+                                    class="min-h-11 text-sm font-medium text-indigo-600"
+                                >
+                                    Open
+                                </Link>
+                            </div>
+                        </li>
+                    </ul>
+                    <div class="hidden overflow-x-auto md:block">
                         <table class="w-full">
                             <thead class="border-b border-slate-200 bg-slate-50">
                                 <tr>

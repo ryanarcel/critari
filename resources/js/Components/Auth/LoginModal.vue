@@ -36,8 +36,10 @@ const closeModal = () => {
 </script>
 
 <template>
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div class="w-full max-w-md rounded-2xl bg-slate-900 shadow-2xl">
+    <div class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+        <div
+            class="max-h-[92dvh] w-full overflow-y-auto rounded-t-2xl bg-slate-900 shadow-2xl sm:max-w-md sm:rounded-2xl"
+        >
             <!-- Header -->
             <div class="flex items-center justify-between border-b border-slate-700 px-6 py-5">
                 <h2 class="text-xl font-bold text-white">Sign In to Critari</h2>
