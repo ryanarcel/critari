@@ -4,7 +4,12 @@ import { Head, Link, usePage } from '@inertiajs/vue3';
 import LoginModal from '@/Components/Auth/LoginModal.vue';
 
 const page = usePage();
-const user = computed(() => (page.props.auth as { user: { name: string } | null })?.user ?? null);
+const user = computed(
+    () => (page.props.auth as { user: { name: string; role?: string } | null })?.user ?? null,
+);
+const homeUrl = computed(() =>
+    user.value?.role === 'student' ? route('student.home') : route('dashboard'),
+);
 const showLoginModal = ref(false);
 
 const generateSessionId = () => {
@@ -43,7 +48,7 @@ const generateSessionId = () => {
                 <div class="flex items-center space-x-4">
                     <template v-if="user">
                         <Link
-                            :href="route('dashboard')"
+                            :href="homeUrl"
                             class="text-xs font-bold uppercase tracking-wider text-indigo-100 transition-colors hover:text-white"
                         >
                             Dashboard

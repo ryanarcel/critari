@@ -3,6 +3,7 @@
 namespace Tests;
 
 use App\Models\Tenant;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Schema;
 use Stancl\Tenancy\Exceptions\TenantDatabaseAlreadyExistsException;
@@ -23,8 +24,10 @@ abstract class TestCase extends BaseTestCase
         if (! $tenant) {
             try {
                 $tenant = Tenant::create(['id' => $this->tenantId]);
-            } catch (TenantDatabaseAlreadyExistsException) {
-                $tenant = Tenant::withoutEvents(fn () => Tenant::create(['id' => $this->tenantId]));
+            } catch (TenantDatabaseAlreadyExistsException|UniqueConstraintViolationException) {
+                $tenant = Tenant::find($this->tenantId) ?? Tenant::withoutEvents(
+                    fn () => Tenant::create(['id' => $this->tenantId])
+                );
             }
         }
 

@@ -6,6 +6,7 @@ use App\Models\Assignment;
 use App\Models\Question;
 use App\Models\Submission;
 use App\Models\User;
+use App\Support\RoleHome;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -22,8 +23,12 @@ class StudentController extends Controller
     {
         $user = Auth::user();
 
-        if (! $user || $user->role !== 'student') {
-            return redirect()->route('dashboard');
+        if (! $user) {
+            return redirect()->route('login');
+        }
+
+        if (! $user->isStudent()) {
+            return redirect(RoleHome::path($user));
         }
 
         $assignments = $user->assignments()
@@ -214,7 +219,7 @@ class StudentController extends Controller
     {
         $user = Auth::user();
 
-        abort_unless($user !== null && $user->role === 'student', 404);
+        abort_unless($user !== null && $user->isStudent(), 404);
 
         return $user;
     }

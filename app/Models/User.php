@@ -60,4 +60,9 @@ class User extends Authenticatable
             ->withPivot('role', 'assigned_at')
             ->withTimestamps();
     }
+
+    public function isStudent(): bool
+    {
+        return $this->role === 'student';
+    }
 }

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\OAuthState;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\RoleHome;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -26,6 +27,12 @@ class SocialiteController extends Controller
         $validated = $request->validate([
             'role' => ['required', 'in:teacher,student'],
         ]);
+
+        if (Auth::check()) {
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
 
         $tenantHost = $request->getHost();
         $stateToken = Str::random(40);
@@ -112,7 +119,7 @@ class SocialiteController extends Controller
                 'updated_at' => now(),
             ]);
 
-            $protocol = request()->secure() ? 'https' : 'http';
+            $protocol = request()->getScheme();
             $verifyUrl = "{$protocol}://{$tenantHost}/auth/oauth/verify?token={$token}";
 
             Log::info('OAuth callback - redirecting to verify endpoint', [
@@ -170,7 +177,8 @@ class SocialiteController extends Controller
             ]);
 
             Auth::login($user, remember: true);
-
+            session()->forget('url.intended');
+            session()->regenerate();
             session()->save();
 
             $sessionId = session()->getId();
@@ -179,17 +187,16 @@ class SocialiteController extends Controller
                 'auth_check' => Auth::check(),
                 'auth_id' => Auth::id(),
                 'session_id' => $sessionId,
+                'role' => $user->role,
                 'session_in_db' => DB::connection('landlord')->table('sessions')->where('id', $sessionId)->exists(),
             ]);
 
-            $redirect = $user->role === 'student'
-                ? redirect()->route('student.home')
-                : redirect()->route('dashboard');
+            $redirect = redirect(RoleHome::path($user));
 
             $intendedRole = $data['intended_role'] ?? $record->intended_role ?? null;
 
             if ($intendedRole && $intendedRole !== $user->role) {
-                $redirect->with('status', 'This Google account is already a '.$user->role.'.');
+                $redirect->with('status', 'This Google account is already a '.$user->role.'. Use a different Google account to sign in as a '.$intendedRole.'.');
             }
 
             return $redirect;

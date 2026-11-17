@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Assignment;
 use App\Models\Submission;
+use App\Support\RoleHome;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -29,8 +30,8 @@ class DashboardController extends Controller
             return redirect()->route('login');
         }
 
-        if ($user->role === 'student') {
-            return redirect()->route('student.home');
+        if ($user->isStudent()) {
+            return redirect(RoleHome::path($user));
         }
 
         $assignments = Assignment::query()

@@ -190,4 +190,52 @@ class GoogleOAuthTest extends TestCase
                 ->where('user.name', $user->name)
             );
     }
+
+    public function test_authenticated_teachers_can_view_the_dashboard(): void
+    {
+        $user = User::factory()->teacher()->create();
+
+        $this->actingAs($user)
+            ->get($this->tenantUrl('/dashboard'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('Dashboard'));
+    }
+
+    public function test_authenticated_students_visiting_login_go_to_student_home(): void
+    {
+        $user = User::factory()->student()->create();
+
+        $this->actingAs($user)
+            ->get($this->tenantUrl('/login'))
+            ->assertRedirect('/student');
+    }
+
+    public function test_authenticated_teachers_visiting_login_go_to_the_dashboard(): void
+    {
+        $user = User::factory()->teacher()->create();
+
+        $this->actingAs($user)
+            ->get($this->tenantUrl('/login'))
+            ->assertRedirect('/dashboard');
+    }
+
+    public function test_teacher_google_sign_in_starts_even_if_a_student_is_logged_in(): void
+    {
+        $this->mockGoogleRedirect();
+        $student = User::factory()->student()->create();
+
+        $this->actingAs($student)
+            ->get($this->tenantUrl('/auth/google?role=teacher'))
+            ->assertRedirect('https://accounts.google.com');
+    }
+
+    public function test_student_google_sign_in_starts_even_if_a_teacher_is_logged_in(): void
+    {
+        $this->mockGoogleRedirect();
+        $teacher = User::factory()->teacher()->create();
+
+        $this->actingAs($teacher)
+            ->get($this->tenantUrl('/auth/google?role=student'))
+            ->assertRedirect('https://accounts.google.com');
+    }
 }

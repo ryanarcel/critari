@@ -34,11 +34,10 @@ Route::middleware('guest')->group(function () {
 
     Route::post('reset-password', [NewPasswordController::class, 'store'])
         ->name('password.store');
-
-    // Google OAuth Routes
-    Route::get('auth/google', [SocialiteController::class, 'redirect'])->name('auth.google');
-    Route::get('auth/google/callback', [SocialiteController::class, 'callback'])->name('auth.google.callback');
 });
+
+Route::get('auth/google', [SocialiteController::class, 'redirect'])->name('auth.google');
+Route::get('auth/google/callback', [SocialiteController::class, 'callback'])->name('auth.google.callback');
 
 Route::middleware('auth')->group(function () {
     Route::get('verify-email', EmailVerificationPromptController::class)
