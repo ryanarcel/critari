@@ -3,7 +3,6 @@ import Checkbox from '@/Components/Checkbox.vue';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import GoogleRoleButtons from '@/Components/Auth/GoogleRoleButtons.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
@@ -32,21 +31,26 @@ const submit = () => {
 
 <template>
     <GuestLayout>
-        <Head title="Log in" />
+        <Head title="Sign in" />
 
-        <div v-if="status" class="mb-4 text-sm font-medium text-green-600">
+        <h1 class="text-xl font-bold tracking-tight text-slate-900">Sign in</h1>
+        <p class="mt-1 text-sm text-slate-500">
+            Continue as a teacher or student, or use email.
+        </p>
+
+        <div v-if="status" class="mt-4 rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
             {{ status }}
         </div>
 
-        <GoogleRoleButtons class="mb-6" />
+        <GoogleRoleButtons class="mt-6" />
 
-        <div class="mb-6 flex items-center">
-            <div class="flex-1 border-t border-gray-200"></div>
-            <span class="px-3 text-xs uppercase tracking-wide text-gray-400">Or with email</span>
-            <div class="flex-1 border-t border-gray-200"></div>
+        <div class="my-6 flex items-center">
+            <div class="flex-1 border-t border-slate-200"></div>
+            <span class="px-3 text-xs font-medium uppercase tracking-wide text-slate-400">Or with email</span>
+            <div class="flex-1 border-t border-slate-200"></div>
         </div>
 
-        <form @submit.prevent="submit">
+        <form class="space-y-4" @submit.prevent="submit">
             <div>
                 <InputLabel for="email" value="Email" />
 
@@ -63,7 +67,7 @@ const submit = () => {
                 <InputError class="mt-2" :message="form.errors.email" />
             </div>
 
-            <div class="mt-4">
+            <div>
                 <InputLabel for="password" value="Password" />
 
                 <TextInput
@@ -78,30 +82,38 @@ const submit = () => {
                 <InputError class="mt-2" :message="form.errors.password" />
             </div>
 
-            <div class="mt-4 block">
+            <div class="flex items-center justify-between gap-3">
                 <label class="flex items-center">
                     <Checkbox v-model:checked="form.remember" name="remember" />
-                    <span class="ms-2 text-sm text-gray-600">Remember me</span>
+                    <span class="ms-2 text-sm text-slate-600">Remember me</span>
                 </label>
-            </div>
 
-            <div class="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
                 <Link
                     v-if="canResetPassword"
                     :href="route('password.request')"
-                    class="rounded-md text-center text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                    class="text-sm font-medium text-indigo-600 hover:text-indigo-700"
                 >
-                    Forgot your password?
+                    Forgot password?
                 </Link>
-
-                <PrimaryButton
-                    class="w-full sm:ms-4 sm:w-auto"
-                    :class="{ 'opacity-25': form.processing }"
-                    :disabled="form.processing"
-                >
-                    Log in
-                </PrimaryButton>
             </div>
+
+            <button
+                type="submit"
+                class="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="form.processing"
+            >
+                {{ form.processing ? 'Signing in...' : 'Sign in' }}
+            </button>
         </form>
+
+        <p class="mt-6 text-center text-sm text-slate-500">
+            Don't have an account?
+            <Link
+                :href="route('register')"
+                class="font-medium text-indigo-600 hover:text-indigo-700"
+            >
+                Register
+            </Link>
+        </p>
     </GuestLayout>
 </template>
