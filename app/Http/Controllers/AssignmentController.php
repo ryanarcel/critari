@@ -7,6 +7,7 @@ use App\Models\Criterion;
 use App\Models\Demo;
 use App\Models\Question;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -191,6 +192,7 @@ class AssignmentController extends Controller
         ]);
 
         return Inertia::render('Assignments/Show', [
+            'status' => session('status'),
             'user' => [
                 'name' => Auth::user()->name,
             ],
@@ -200,6 +202,7 @@ class AssignmentController extends Controller
                 'join_code' => $assignment->join_code,
                 'max_score' => $assignment->max_score,
                 'overall_max_score' => $assignment->overallMaxScore(),
+                'grades_released_at' => $assignment->grades_released_at?->toIso8601String(),
                 'questions' => $assignment->questions->map(fn (Question $question) => [
                     'id' => $question->id,
                     'prompt' => $question->prompt,
@@ -208,10 +211,23 @@ class AssignmentController extends Controller
                     'id' => $criterion->id,
                     'name' => $criterion->name,
                 ])->values(),
-                'students' => $assignment->students->map(fn ($student) => [
-                    'id' => $student->id,
-                    'name' => $student->name,
-                ])->values(),
+                'students' => $assignment->students->map(function ($student) use ($assignment) {
+                    $submission = $assignment->submissions->firstWhere('user_id', $student->id);
+
+                    return [
+                        'id' => $student->id,
+                        'name' => $student->name,
+                        'submission' => $submission && $submission->hasSubmittedResponse()
+                            ? [
+                                'status' => $submission->status,
+                                'score' => $submission->score !== null ? (float) $submission->score : null,
+                                'source' => ($submission->payload['source'] ?? null) === 'paper'
+                                    ? 'paper'
+                                    : 'app',
+                            ]
+                            : null,
+                    ];
+                })->values(),
                 'submissions' => $assignment->submissions->map(fn ($submission) => [
                     'id' => $submission->id,
                     'student_name' => $submission->user?->name
@@ -230,6 +246,34 @@ class AssignmentController extends Controller
                 ])->values(),
             ],
         ]);
+    }
+
+    public function releaseGrades(Assignment $assignment): RedirectResponse
+    {
+        abort_unless($assignment->ownedBy(Auth::user()), 404);
+
+        if ($assignment->grades_released_at === null) {
+            $assignment->update([
+                'grades_released_at' => now(),
+            ]);
+        }
+
+        return redirect()
+            ->route('assignments.show', $assignment)
+            ->with('status', 'Grades are now visible to students.');
+    }
+
+    public function hideGrades(Assignment $assignment): RedirectResponse
+    {
+        abort_unless($assignment->ownedBy(Auth::user()), 404);
+
+        $assignment->update([
+            'grades_released_at' => null,
+        ]);
+
+        return redirect()
+            ->route('assignments.show', $assignment)
+            ->with('status', 'Grades are hidden from students.');
     }
 
     /**

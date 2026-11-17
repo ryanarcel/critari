@@ -66,6 +66,19 @@ class Submission extends Model
         return trim((string) ($this->payload['student_response'] ?? ''));
     }
 
+    public function hasSubmittedResponse(): bool
+    {
+        if ($this->status === 'graded') {
+            return true;
+        }
+
+        $answers = collect($this->payload['answers'] ?? [])
+            ->filter(fn ($text) => trim((string) $text) !== '');
+
+        return $answers->isNotEmpty()
+            || filled(trim((string) ($this->payload['student_response'] ?? '')));
+    }
+
     /**
      * @return list<array{question_id: int|null, prompt: string|null, response: string, score: float|int, max_score: int|null, overall_feedback: string|null, scores: array<int, array{criterion_name: string|null, score: mixed, feedback: string|null}>}>
      */
@@ -82,13 +95,16 @@ class Submission extends Model
         $feedback = collect($this->payload['question_feedback'] ?? []);
 
         $grades = $assignment->questions->map(function (Question $question) use ($assignment, $feedback) {
+            $response = $this->answerFor($question->id);
             $questionScores = $this->scores->where('question_id', $question->id);
+            $captured = $response !== '';
 
             return [
                 'question_id' => $question->id,
                 'prompt' => $question->prompt,
-                'response' => $this->answerFor($question->id),
-                'score' => (float) $questionScores->sum('score'),
+                'response' => $response,
+                'captured' => $captured,
+                'score' => $captured ? (float) $questionScores->sum('score') : null,
                 'max_score' => $assignment->max_score,
                 'overall_feedback' => $feedback[$question->id] ?? $feedback[(string) $question->id] ?? null,
                 'scores' => $questionScores->map(fn (CriterionScore $score) => [
@@ -106,6 +122,7 @@ class Submission extends Model
                 'question_id' => null,
                 'prompt' => null,
                 'response' => $this->answerFor(null),
+                'captured' => true,
                 'score' => (float) $unassigned->sum('score'),
                 'max_score' => $assignment->max_score,
                 'overall_feedback' => $this->payload['overall_feedback'] ?? null,

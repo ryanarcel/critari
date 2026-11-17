@@ -16,6 +16,72 @@ class PaperOcrService
     {
         $this->assertSupported($file);
 
+        return $this->fromImage(
+            $file,
+            'Transcribe every word on this paper exactly as written. Do not grade, summarize, correct grammar, or add notes. If the page is blank, return an empty string. Return only the transcribed text.'
+        );
+    }
+
+    /**
+     * @param  list<array{id: int, prompt: string}>  $questions
+     * @return array<int, string>
+     */
+    public function transcribeAnswers(UploadedFile $file, array $questions): array
+    {
+        $questions = array_values($questions);
+
+        if ($questions === []) {
+            return [];
+        }
+
+        if (count($questions) === 1) {
+            return [(int) $questions[0]['id'] => $this->transcribe($file)];
+        }
+
+        $this->assertSupported($file);
+
+        $list = collect($questions)
+            ->map(fn (array $question, int $index): string => ($index + 1).'. '.$question['prompt'])
+            ->implode("\n");
+
+        $raw = $this->fromImage(
+            $file,
+            "This student paper answers these questions in order:\n{$list}\n\nTranscribe the student's answer for each question exactly as written. Do not grade, summarize, correct grammar, or add notes. Return ONLY JSON of the form {\"answers\":[{\"question_number\":1,\"text\":\"...\"}]} with one object per question. Use an empty string when a question has no answer on the page."
+        );
+
+        $clean = trim((string) preg_replace('/^```json|^```|```$/m', '', $raw));
+        $data = json_decode($clean, true);
+        $mapped = [];
+
+        if (is_array($data['answers'] ?? null)) {
+            foreach ($data['answers'] as $answer) {
+                if (! is_array($answer)) {
+                    continue;
+                }
+
+                $index = ((int) ($answer['question_number'] ?? 0)) - 1;
+
+                if (! isset($questions[$index])) {
+                    continue;
+                }
+
+                $mapped[(int) $questions[$index]['id']] = trim((string) ($answer['text'] ?? ''));
+            }
+        }
+
+        foreach ($questions as $index => $question) {
+            $id = (int) $question['id'];
+
+            if (! array_key_exists($id, $mapped)) {
+                $mapped[$id] = $index === 0 && $mapped === [] ? $raw : '';
+            }
+        }
+
+        return $mapped;
+    }
+
+    private function fromImage(UploadedFile $file, string $instruction): string
+    {
         $encoded = $this->toJpegData($file);
 
         $response = OpenAI::chat()->create([
@@ -30,7 +96,7 @@ class PaperOcrService
                     'content' => [
                         [
                             'type' => 'text',
-                            'text' => 'Transcribe every word on this paper exactly as written. Do not grade, summarize, correct grammar, or add notes. If the page is blank, return an empty string. Return only the transcribed text.',
+                            'text' => $instruction,
                         ],
                         [
                             'type' => 'image_url',

@@ -179,15 +179,29 @@ class SubmissionController extends Controller
 
             $questionFeedback = [];
             $persistedScores = [];
+            $reusedQuestionIds = [];
 
             foreach ($targets as $target) {
-                $data = $this->gradeResponseWithAi(
+                $questionId = $target['question']?->id;
+                $data = $this->matchingGradedQuestion(
                     $assignment,
-                    $target['prompt'],
+                    $submission,
+                    $target['question'],
                     $target['response']
                 );
 
-                $questionId = $target['question']?->id;
+                if ($data !== null) {
+                    if ($questionId !== null) {
+                        $reusedQuestionIds[] = $questionId;
+                    }
+                } else {
+                    $data = $this->gradeResponseWithAi(
+                        $assignment,
+                        $target['prompt'],
+                        $target['response']
+                    );
+                }
+
                 $questionFeedback[$questionId ?? 'paper'] = $data['overall_feedback'] ?? '';
 
                 foreach ($this->scoresForCriteria($assignment, $data['scores'] ?? []) as $scoreData) {
@@ -201,7 +215,9 @@ class SubmissionController extends Controller
                 }
             }
 
-            return DB::transaction(function () use ($submission, $assignment, $persistedScores, $questionFeedback) {
+            $gradedMaxScore = $assignment->overallMaxScore();
+
+            return DB::transaction(function () use ($submission, $assignment, $persistedScores, $questionFeedback, $reusedQuestionIds, $gradedMaxScore) {
                 CriterionScore::query()->where('submission_id', $submission->id)->delete();
 
                 foreach ($persistedScores as $scoreData) {
@@ -237,7 +253,8 @@ class SubmissionController extends Controller
                     'message' => 'Assessment completed successfully',
                     'submission_id' => $submission->id,
                     'total_score' => $totalScore,
-                    'max_score' => $assignment->overallMaxScore(),
+                    'max_score' => $gradedMaxScore,
+                    'reused_question_ids' => $reusedQuestionIds,
                     'question_grades' => $submission->questionGrades($assignment),
                     'scores' => $persistedScores,
                 ], 201);
@@ -291,6 +308,88 @@ class SubmissionController extends Controller
             'prompt' => $question?->prompt ?? $assignment->formattedPrompts(),
             'response' => $fallback,
         ]];
+    }
+
+    /**
+     * @return array{scores: array<int, array{criterion_name: string, score: mixed, feedback?: string}>, overall_feedback?: string}|null
+     */
+    private function matchingGradedQuestion(
+        Assignment $assignment,
+        Submission $submission,
+        ?Question $question,
+        string $response
+    ): ?array {
+        $candidates = Submission::query()
+            ->where('assignment_id', $assignment->id)
+            ->where('status', 'graded')
+            ->whereKeyNot($submission->id)
+            ->with('scores.criterion')
+            ->orderByDesc('graded_at')
+            ->get();
+
+        foreach ($candidates as $candidate) {
+            $otherResponse = $question
+                ? $candidate->answerFor($question->id)
+                : $candidate->answerFor(null);
+
+            if (! $this->responsesMatch($response, $otherResponse)) {
+                continue;
+            }
+
+            $scores = $question
+                ? $candidate->scores->where('question_id', $question->id)
+                : $candidate->scores->whereNull('question_id');
+
+            if ($scores->isEmpty() && $question === null) {
+                $scores = $candidate->scores;
+            }
+
+            if ($scores->count() < $assignment->criteria->count()) {
+                continue;
+            }
+
+            $feedback = $candidate->payload['question_feedback'] ?? [];
+            $overall = $question === null
+                ? ($candidate->payload['overall_feedback'] ?? '')
+                : ($feedback[$question->id] ?? $feedback[(string) $question->id] ?? '');
+
+            return [
+                'overall_feedback' => $overall,
+                'scores' => $scores->map(fn (CriterionScore $score): array => [
+                    'criterion_name' => $score->criterion?->name,
+                    'score' => $score->score,
+                    'feedback' => $score->feedback,
+                ])->values()->all(),
+            ];
+        }
+
+        return null;
+    }
+
+    private function responsesMatch(string $left, string $right): bool
+    {
+        $a = $this->normalizedResponse($left);
+        $b = $this->normalizedResponse($right);
+
+        if ($a === '' || $b === '') {
+            return false;
+        }
+
+        if ($a === $b) {
+            return true;
+        }
+
+        similar_text($a, $b, $percent);
+
+        return $percent >= 90.0;
+    }
+
+    private function normalizedResponse(string $text): string
+    {
+        $text = mb_strtolower($text);
+        $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
+
+        return trim($text);
     }
 
     /**

@@ -33,12 +33,14 @@ class StudentController extends Controller
             ->get()
             ->map(function (Assignment $assignment) {
                 $submission = $assignment->submissions->first();
+                $gradesVisible = $assignment->gradesReleased()
+                    && $submission?->status === 'graded';
 
                 return [
                     'id' => $assignment->id,
                     'title' => $assignment->title,
-                    'status' => $submission?->status ?? 'not_started',
-                    'score' => $submission?->score,
+                    'status' => $gradesVisible ? 'graded' : ($submission ? 'pending' : 'not_started'),
+                    'score' => $gradesVisible ? (float) $submission->score : null,
                     'max_score' => $assignment->max_score,
                     'overall_max_score' => $assignment->overallMaxScore(),
                 ];
@@ -108,6 +110,8 @@ class StudentController extends Controller
             ->with('scores.criterion')
             ->first();
         $savedAnswers = collect($submission?->payload['answers'] ?? []);
+        $gradesVisible = $assignment->gradesReleased()
+            && $submission?->status === 'graded';
 
         return Inertia::render('Student/Assignment', [
             'status' => session('status'),
@@ -119,6 +123,7 @@ class StudentController extends Controller
                 'title' => $assignment->title,
                 'max_score' => $assignment->max_score,
                 'overall_max_score' => $assignment->overallMaxScore(),
+                'grades_released' => $assignment->gradesReleased(),
                 'questions' => $assignment->questions->map(fn (Question $question) => [
                     'id' => $question->id,
                     'prompt' => $question->prompt,
@@ -129,8 +134,10 @@ class StudentController extends Controller
             ],
             'submission' => $submission ? [
                 'status' => $submission->status,
-                'score' => $submission->score,
-                'question_grades' => $submission->questionGrades($assignment),
+                'score' => $gradesVisible ? (float) $submission->score : null,
+                'question_grades' => $gradesVisible
+                    ? $submission->questionGrades($assignment)
+                    : [],
             ] : null,
         ]);
     }
@@ -199,7 +206,7 @@ class StudentController extends Controller
         }
 
         return redirect()
-            ->route('student.assignments.show', $assignment)
+            ->route('student.home')
             ->with('status', 'Your answers were submitted.');
     }
 

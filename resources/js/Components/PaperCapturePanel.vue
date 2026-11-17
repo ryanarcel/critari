@@ -6,9 +6,16 @@ interface Question {
     prompt: string;
 }
 
+interface ExistingSubmission {
+    status: string;
+    score: number | string | null;
+    source?: string | null;
+}
+
 interface Student {
     id: number;
     name: string;
+    submission?: ExistingSubmission | null;
 }
 
 interface Score {
@@ -49,6 +56,31 @@ const emit = defineEmits<{
 
 const axios = (window as any).axios;
 
+type QuestionScope = 'all' | number;
+
+const questionOrdinals = [
+    'First',
+    'Second',
+    'Third',
+    'Fourth',
+    'Fifth',
+    'Sixth',
+    'Seventh',
+    'Eighth',
+    'Ninth',
+    'Tenth',
+];
+
+const needsScope = computed(() => props.questions.length > 1);
+const defaultScope = (): QuestionScope | null => {
+    if (needsScope.value) {
+        return null;
+    }
+
+    return props.questions[0]?.id ?? 'all';
+};
+const step = ref<'scope' | 'review'>(needsScope.value ? 'scope' : 'review');
+const selectedScope = ref<QuestionScope | null>(defaultScope());
 const questionIndex = ref(0);
 const drafts = ref<Record<number, string>>({});
 const photoCount = ref(0);
@@ -62,10 +94,80 @@ const errorMessage = ref('');
 const saving = ref(false);
 const grading = ref(false);
 const gradeResult = ref<GradeResult | null>(null);
+const overridePrompt = ref(false);
+const confirmedOverride = ref(false);
+const detectedExisting = ref<ExistingSubmission | null>(null);
 
-const currentQuestion = computed(() => props.questions[questionIndex.value] ?? null);
+const scopedQuestions = computed(() => {
+    if (selectedScope.value === 'all' || selectedScope.value === null) {
+        return props.questions;
+    }
 
-const questionNumber = computed(() => questionIndex.value + 1);
+    return props.questions.filter((question) => question.id === selectedScope.value);
+});
+
+const currentQuestion = computed(() => {
+    if (selectedScope.value === 'all') {
+        return scopedQuestions.value[questionIndex.value] ?? scopedQuestions.value[0] ?? null;
+    }
+
+    return scopedQuestions.value[0] ?? props.questions[questionIndex.value] ?? null;
+});
+
+const questionLabel = (index: number) => {
+    const ordinal = questionOrdinals[index];
+
+    return ordinal ? `${ordinal} question` : `Question ${index + 1}`;
+};
+
+const scopeLabel = computed(() => {
+    if (selectedScope.value === 'all') {
+        return 'All questions';
+    }
+
+    if (typeof selectedScope.value === 'number') {
+        const index = props.questions.findIndex((question) => question.id === selectedScope.value);
+
+        return index >= 0 ? questionLabel(index) : 'Question';
+    }
+
+    return '';
+});
+
+const coversAllQuestions = computed(() => selectedScope.value === 'all');
+
+const existingSubmission = computed((): ExistingSubmission | null => {
+    if (detectedExisting.value) {
+        return detectedExisting.value;
+    }
+
+    const student = selectedStudent.value;
+
+    if (!student || student.id === null || !('submission' in student)) {
+        return null;
+    }
+
+    return student.submission ?? null;
+});
+
+const overrideMessage = computed(() => {
+    const student = selectedStudent.value;
+    const existing = existingSubmission.value;
+
+    if (!student || !existing) {
+        return '';
+    }
+
+    if (existing.status === 'graded') {
+        if (existing.score !== null && existing.score !== '' && props.overallMaxScore !== null) {
+            return `${student.name} already has a grade of ${existing.score} / ${props.overallMaxScore}. Assigning this photo will replace their answers and override that grade.`;
+        }
+
+        return `${student.name} already has a grade. Assigning this photo will replace their answers and override that grade.`;
+    }
+
+    return `${student.name} already submitted a response. Assigning this photo will replace those answers.`;
+});
 
 const currentText = computed({
     get: () => (currentQuestion.value ? drafts.value[currentQuestion.value.id] ?? '' : ''),
@@ -81,7 +183,13 @@ const currentText = computed({
     },
 });
 
-const hasNextQuestion = computed(() => questionIndex.value < props.questions.length - 1);
+const hasNextQuestion = computed(
+    () => !coversAllQuestions.value && questionIndex.value < props.questions.length - 1,
+);
+
+const unansweredQuestions = computed(() =>
+    props.questions.filter((question) => (drafts.value[question.id] ?? '').trim() === ''),
+);
 
 const answeredCount = computed(
     () => Object.values(drafts.value).filter((text) => text.trim() !== '').length,
@@ -182,8 +290,28 @@ const compressImage = async (file: File): Promise<File> => {
     return new File([blob], 'paper.jpg', { type: 'image/jpeg' });
 };
 
+const setDraft = (questionId: number, value: string) => {
+    drafts.value = {
+        ...drafts.value,
+        [questionId]: value,
+    };
+};
+
+const onDraftInput = (questionId: number, event: Event) => {
+    const target = event.target as HTMLTextAreaElement;
+
+    setDraft(questionId, target.value);
+};
+
+const applyExtractedText = (questionId: number, extracted: string) => {
+    const previous = appendNextPhoto.value ? (drafts.value[questionId] ?? '').trim() : '';
+    const next = previous && extracted ? `${previous}\n\n${extracted}` : extracted || previous;
+
+    setDraft(questionId, next);
+};
+
 const readPhoto = async (file: File) => {
-    if (!currentQuestion.value) {
+    if (selectedScope.value === null) {
         return;
     }
 
@@ -192,18 +320,34 @@ const readPhoto = async (file: File) => {
     gradeResult.value = null;
     revokePreview();
     previewUrl.value = URL.createObjectURL(file);
+    step.value = 'review';
 
     try {
         const compressed = await compressImage(file);
         const form = new FormData();
-        form.append('question_id', String(currentQuestion.value.id));
         form.append('image', compressed);
 
-        const response = await axios.post(`/assignments/${props.assignmentId}/paper-ocr`, form);
-        const extracted = String(response.data.text ?? '').trim();
-        const previous = appendNextPhoto.value ? currentText.value.trim() : '';
+        if (coversAllQuestions.value) {
+            form.append('all_questions', '1');
+        } else if (currentQuestion.value) {
+            form.append('question_id', String(currentQuestion.value.id));
+        }
 
-        currentText.value = previous && extracted ? `${previous}\n\n${extracted}` : extracted || previous;
+        const response = await axios.post(`/assignments/${props.assignmentId}/paper-ocr`, form);
+
+        if (coversAllQuestions.value && Array.isArray(response.data.answers)) {
+            response.data.answers.forEach((answer: { question_id?: number; text?: string }) => {
+                if (answer.question_id) {
+                    applyExtractedText(answer.question_id, String(answer.text ?? '').trim());
+                }
+            });
+        } else if (currentQuestion.value) {
+            applyExtractedText(
+                currentQuestion.value.id,
+                String(response.data.text ?? '').trim(),
+            );
+        }
+
         photoCount.value += 1;
     } catch (error: any) {
         errorMessage.value =
@@ -228,6 +372,9 @@ const selectStudent = (student: Student | { id: null; name: string }) => {
     selectedStudent.value = student;
     studentQuery.value = student.name;
     showMatches.value = false;
+    overridePrompt.value = false;
+    confirmedOverride.value = false;
+    detectedExisting.value = null;
 };
 
 const addWalkIn = () => {
@@ -242,6 +389,9 @@ const clearStudent = () => {
     selectedStudent.value = null;
     studentQuery.value = '';
     showMatches.value = false;
+    overridePrompt.value = false;
+    confirmedOverride.value = false;
+    detectedExisting.value = null;
 };
 
 const persistPaper = async (): Promise<number | null> => {
@@ -268,22 +418,47 @@ const persistPaper = async (): Promise<number | null> => {
             `/assignments/${props.assignmentId}/paper-submissions`,
             payload,
         );
+
+        if (created.data.requires_override && !confirmedOverride.value) {
+            detectedExisting.value = {
+                status: created.data.status ?? 'pending',
+                score: created.data.score ?? null,
+            };
+            overridePrompt.value = true;
+
+            return null;
+        }
+
         const submissionId = created.data.submission_id as number;
 
         await axios.put(`/assignments/${props.assignmentId}/paper-submissions/${submissionId}`, {
             student_name: selectedStudent.value.id === null ? selectedStudent.value.name : undefined,
-            answers: Object.entries(drafts.value).map(([questionId, response]) => ({
-                question_id: Number(questionId),
-                response,
-            })),
+            override: confirmedOverride.value || undefined,
+            answers: Object.entries(drafts.value)
+                .filter(([, response]) => response.trim() !== '')
+                .map(([questionId, response]) => ({
+                    question_id: Number(questionId),
+                    response,
+                })),
         });
 
         return submissionId;
     } catch (error: any) {
+        if (error.response?.status === 422 && error.response?.data?.errors?.override) {
+            detectedExisting.value = detectedExisting.value ?? {
+                status: 'pending',
+                score: null,
+            };
+            overridePrompt.value = true;
+
+            return null;
+        }
+
         errorMessage.value =
             error.response?.data?.message ||
             error.response?.data?.errors?.user_id?.[0] ||
             error.response?.data?.errors?.student_name?.[0] ||
+            error.response?.data?.errors?.override?.[0] ||
             'Could not save this paper.';
 
         return null;
@@ -297,8 +472,19 @@ const gradePaper = async () => {
         return;
     }
 
+    if (!ensureStudent()) {
+        return;
+    }
+
+    if (existingSubmission.value && !confirmedOverride.value) {
+        overridePrompt.value = true;
+
+        return;
+    }
+
     grading.value = true;
     errorMessage.value = '';
+    overridePrompt.value = false;
 
     try {
         const submissionId = await persistPaper();
@@ -328,15 +514,50 @@ const gradePaper = async () => {
     }
 };
 
+const chooseScope = (scope: QuestionScope) => {
+    selectedScope.value = scope;
+
+    if (scope === 'all') {
+        questionIndex.value = 0;
+    } else {
+        const index = props.questions.findIndex((question) => question.id === scope);
+        questionIndex.value = Math.max(0, index);
+    }
+};
+
+const takePhoto = () => {
+    if (selectedScope.value === null) {
+        return;
+    }
+
+    emit('capture');
+};
+
 const goToNextQuestion = () => {
     if (!hasNextQuestion.value) {
         return;
     }
 
-    questionIndex.value += 1;
+    const nextIndex = questionIndex.value + 1;
+    const nextQuestion = props.questions[nextIndex];
+
+    if (!nextQuestion) {
+        return;
+    }
+
+    chooseScope(nextQuestion.id);
     photoCount.value = 0;
     appendNextPhoto.value = false;
     emit('capture');
+};
+
+const photographAnotherQuestion = () => {
+    selectedScope.value = null;
+    photoCount.value = 0;
+    appendNextPhoto.value = false;
+    gradeResult.value = null;
+    revokePreview();
+    step.value = 'scope';
 };
 
 const addAnotherPhoto = () => {
@@ -347,6 +568,16 @@ const addAnotherPhoto = () => {
 const retakePhoto = () => {
     appendNextPhoto.value = false;
     emit('capture');
+};
+
+const confirmOverride = () => {
+    confirmedOverride.value = true;
+    overridePrompt.value = false;
+    void gradePaper();
+};
+
+const cancelOverride = () => {
+    overridePrompt.value = false;
 };
 
 const resetForNextPaper = () => {
@@ -361,7 +592,20 @@ const resetForNextPaper = () => {
     saving.value = false;
     grading.value = false;
     gradeResult.value = null;
+    overridePrompt.value = false;
+    confirmedOverride.value = false;
+    detectedExisting.value = null;
     revokePreview();
+
+    if (needsScope.value) {
+        selectedScope.value = null;
+        step.value = 'scope';
+
+        return;
+    }
+
+    selectedScope.value = defaultScope();
+    step.value = 'review';
     emit('capture');
 };
 
@@ -383,13 +627,16 @@ onBeforeUnmount(() => {
             <header class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Photograph a paper
+                        Photograph a Submission
                     </p>
-                    <p v-if="currentQuestion && !gradeResult" class="mt-0.5 text-sm font-medium text-slate-900">
-                        Question {{ questionNumber }} of {{ questions.length }}
+                    <p v-if="step === 'scope'" class="mt-0.5 text-sm font-medium text-slate-900">
+                        Which question is this photo for?
                     </p>
                     <p v-else-if="gradeResult" class="mt-0.5 text-sm font-medium text-slate-900">
                         Graded
+                    </p>
+                    <p v-else class="mt-0.5 text-sm font-medium text-slate-900">
+                        {{ scopeLabel }}
                     </p>
                 </div>
                 <button
@@ -406,7 +653,49 @@ onBeforeUnmount(() => {
                     {{ errorMessage }}
                 </p>
 
-                <template v-if="gradeResult">
+                <template v-if="step === 'scope'">
+                    <p class="text-sm text-slate-600">
+                        Choose whether this photo answers one question or the whole assignment.
+                    </p>
+                    <div class="space-y-2">
+                        <button
+                            type="button"
+                            class="flex min-h-11 w-full flex-col items-start rounded-xl border px-4 py-3 text-left transition"
+                            :class="
+                                selectedScope === 'all'
+                                    ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500'
+                                    : 'border-slate-200 hover:border-indigo-200 hover:bg-slate-50'
+                            "
+                            @click="chooseScope('all')"
+                        >
+                            <span class="text-sm font-semibold text-slate-900">All questions</span>
+                            <span class="mt-0.5 text-xs text-slate-500">
+                                This page has answers for every question.
+                            </span>
+                        </button>
+                        <button
+                            v-for="(question, index) in questions"
+                            :key="question.id"
+                            type="button"
+                            class="flex min-h-11 w-full flex-col items-start rounded-xl border px-4 py-3 text-left transition"
+                            :class="
+                                selectedScope === question.id
+                                    ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500'
+                                    : 'border-slate-200 hover:border-indigo-200 hover:bg-slate-50'
+                            "
+                            @click="chooseScope(question.id)"
+                        >
+                            <span class="text-sm font-semibold text-slate-900">
+                                {{ questionLabel(index) }}
+                            </span>
+                            <span class="mt-0.5 line-clamp-2 text-xs text-slate-500">
+                                {{ question.prompt }}
+                            </span>
+                        </button>
+                    </div>
+                </template>
+
+                <template v-else-if="gradeResult">
                     <div class="rounded-xl bg-indigo-50 px-4 py-6 text-center">
                         <p class="text-sm text-indigo-700">Overall score</p>
                         <p class="mt-1 text-3xl font-bold text-indigo-700">
@@ -466,8 +755,15 @@ onBeforeUnmount(() => {
 
                     <p v-if="reading" class="text-sm font-medium text-indigo-600">Reading photo...</p>
 
-                    <p v-if="currentQuestion" class="text-sm text-slate-700">
+                    <p v-if="currentQuestion && !coversAllQuestions" class="text-sm text-slate-700">
                         {{ currentQuestion.prompt }}
+                    </p>
+
+                    <p
+                        v-if="existingSubmission && overrideMessage"
+                        class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900"
+                    >
+                        {{ overrideMessage }}
                     </p>
 
                     <div>
@@ -523,7 +819,30 @@ onBeforeUnmount(() => {
                         </div>
                     </div>
 
-                    <div>
+                    <div v-if="coversAllQuestions" class="space-y-4">
+                        <div v-for="(question, index) in questions" :key="question.id">
+                            <label
+                                class="block text-sm font-medium text-slate-700"
+                                :for="`paper-text-${question.id}`"
+                            >
+                                {{ questionLabel(index) }}
+                            </label>
+                            <p class="mt-1 text-xs text-slate-500">{{ question.prompt }}</p>
+                            <textarea
+                                :id="`paper-text-${question.id}`"
+                                :value="drafts[question.id] ?? ''"
+                                rows="5"
+                                class="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm leading-relaxed text-slate-900"
+                                placeholder="Confirm this transcription before grading."
+                                @input="onDraftInput(question.id, $event)"
+                            />
+                        </div>
+                        <p class="text-xs text-slate-500">
+                            This is a draft from the photo. Edit it if the reading is wrong, then grade.
+                            {{ answeredCount }} of {{ questions.length }} questions captured
+                        </p>
+                    </div>
+                    <div v-else>
                         <label class="block text-sm font-medium text-slate-700" for="paper-text">
                             Extracted text
                         </label>
@@ -543,13 +862,44 @@ onBeforeUnmount(() => {
             </div>
 
             <footer class="space-y-2 border-t border-slate-200 px-4 py-3">
-                <template v-if="gradeResult">
+                <template v-if="step === 'scope'">
+                    <button
+                        type="button"
+                        :disabled="selectedScope === null"
+                        class="min-h-11 w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        @click="takePhoto"
+                    >
+                        Take photo
+                    </button>
+                </template>
+                <template v-else-if="gradeResult">
                     <button
                         type="button"
                         class="min-h-11 w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
                         @click="resetForNextPaper"
                     >
-                        Photograph next paper
+                        Photograph next submission
+                    </button>
+                </template>
+                <template v-else-if="overridePrompt">
+                    <p class="text-sm text-slate-700">{{ overrideMessage }}</p>
+                    <button
+                        type="button"
+                        class="min-h-11 w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+                        @click="confirmOverride"
+                    >
+                        {{
+                            existingSubmission?.status === 'graded'
+                                ? 'Replace and override grade'
+                                : 'Replace existing response'
+                        }}
+                    </button>
+                    <button
+                        type="button"
+                        class="min-h-11 w-full text-sm font-medium text-slate-600 hover:text-slate-900"
+                        @click="cancelOverride"
+                    >
+                        Cancel
                     </button>
                 </template>
                 <template v-else>
@@ -563,11 +913,20 @@ onBeforeUnmount(() => {
                         Next question
                     </button>
                     <button
+                        v-else-if="needsScope && unansweredQuestions.length > 0 && !coversAllQuestions"
+                        type="button"
+                        :disabled="reading"
+                        class="min-h-11 w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        @click="photographAnotherQuestion"
+                    >
+                        Photograph another question
+                    </button>
+                    <button
                         type="button"
                         :disabled="reading || saving || grading"
                         class="min-h-11 w-full rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
                         :class="
-                            hasNextQuestion
+                            hasNextQuestion || (needsScope && unansweredQuestions.length > 0 && !coversAllQuestions)
                                 ? 'border border-slate-300 bg-white text-slate-900 hover:bg-slate-50'
                                 : 'bg-indigo-600 text-white hover:bg-indigo-500'
                         "
@@ -576,7 +935,7 @@ onBeforeUnmount(() => {
                         {{
                             grading || saving
                                 ? 'Grading...'
-                                : hasNextQuestion
+                                : hasNextQuestion || (needsScope && unansweredQuestions.length > 0 && !coversAllQuestions)
                                   ? 'Skip remaining and grade'
                                   : 'Grade with AI'
                         }}

@@ -122,7 +122,7 @@ class AssignmentGradingTest extends TestCase
             ->post($this->tenantUrl('/student/assignments/'.$assignmentId), [
                 'answers' => $answers,
             ])
-            ->assertRedirect($this->tenantUrl('/student/assignments/'.$assignmentId));
+            ->assertRedirect($this->tenantUrl('/student'));
 
         return (int) $tenant->run(fn () => Submission::query()
             ->where('assignment_id', $assignmentId)
@@ -192,6 +192,7 @@ class AssignmentGradingTest extends TestCase
                 ->where('assignment.overall_max_score', 20)
                 ->has('assignment.submissions', 0)
                 ->has('assignment.students', 0)
+                ->where('assignment.grades_released_at', null)
             );
     }
 
@@ -326,6 +327,42 @@ class AssignmentGradingTest extends TestCase
             $this->assertEquals(8, $submission->scores->first()->score);
             $this->assertSame('Clear argument.', $submission->scores->first()->feedback);
         });
+    }
+
+    public function test_grading_reuses_scores_for_the_same_question_response(): void
+    {
+        $tenant = $this->initializeTenant();
+        $teacher = User::factory()->create();
+        $first = User::factory()->student()->create(['name' => 'Jordan Lee']);
+        $second = User::factory()->student()->create(['name' => 'Alex Kim']);
+        $assignmentId = $this->createAssignmentFor($teacher);
+        $answer = 'Archaeological excavations at Hisarlik show stacked Bronze Age ruins.';
+
+        $firstSubmissionId = $this->joinAndSubmit($first, $assignmentId, $answer);
+        $secondSubmissionId = $this->joinAndSubmit($second, $assignmentId, $answer.'   ');
+        $questionId = $tenant->run(
+            fn () => Question::query()->where('assignment_id', $assignmentId)->value('id')
+        );
+
+        $this->fakeAssessmentResponse();
+
+        $this->actingAs($teacher)
+            ->postJson($this->tenantUrl('/submissions/'.$firstSubmissionId.'/assess'), [
+                'submission_id' => $firstSubmissionId,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('total_score', 8)
+            ->assertJsonPath('reused_question_ids', []);
+
+        $this->actingAs($teacher)
+            ->postJson($this->tenantUrl('/submissions/'.$secondSubmissionId.'/assess'), [
+                'submission_id' => $secondSubmissionId,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('total_score', 8)
+            ->assertJsonPath('reused_question_ids.0', $questionId)
+            ->assertJsonPath('scores.0.score', 8)
+            ->assertJsonPath('scores.0.feedback', 'Clear argument.');
     }
 
     public function test_grading_maps_criterion_names_without_exact_casing(): void
@@ -626,10 +663,183 @@ class AssignmentGradingTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Student/Assignment')
                 ->where('assignment.overall_max_score', 20)
-                ->has('submission.question_grades', 2)
-                ->where('submission.question_grades.0.score', 8)
-                ->where('submission.question_grades.1.score', 4)
+                ->where('assignment.grades_released', false)
+                ->where('submission.status', 'graded')
+                ->where('submission.score', null)
+                ->has('submission.question_grades', 0)
             );
+
+        $this->actingAs($student)
+            ->get($this->tenantUrl('/student'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Student/Home')
+                ->where('assignments.0.status', 'pending')
+                ->where('assignments.0.score', null)
+            );
+    }
+
+    public function test_partial_papers_use_the_assignment_overall_max_score(): void
+    {
+        $tenant = $this->initializeTenant();
+        $teacher = User::factory()->create();
+        $assignmentId = $this->createAssignmentFor($teacher, [
+            'question' => null,
+            'questions' => [
+                ['prompt' => 'Explain the causes of the Trojan War.'],
+                ['prompt' => "What does Hector's death reveal about honor?"],
+            ],
+        ]);
+        $questionId = $tenant->run(
+            fn () => Question::query()
+                ->where('assignment_id', $assignmentId)
+                ->orderBy('order')
+                ->value('id')
+        );
+
+        $submissionId = $this->actingAs($teacher)
+            ->postJson($this->tenantUrl('/assignments/'.$assignmentId.'/paper-submissions'), [
+                'student_name' => 'Test Student 2',
+            ])
+            ->assertCreated()
+            ->json('submission_id');
+
+        $this->actingAs($teacher)
+            ->putJson($this->tenantUrl('/assignments/'.$assignmentId.'/paper-submissions/'.$submissionId), [
+                'answers' => [
+                    [
+                        'question_id' => $questionId,
+                        'response' => 'Archaeological excavations at Hisarlik show stacked Bronze Age ruins.',
+                    ],
+                ],
+            ])
+            ->assertOk();
+
+        $this->fakeAssessmentResponse();
+
+        $this->actingAs($teacher)
+            ->postJson($this->tenantUrl('/submissions/'.$submissionId.'/assess'), [
+                'submission_id' => $submissionId,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('total_score', 8)
+            ->assertJsonPath('max_score', 20);
+
+        $this->actingAs($teacher)
+            ->get($this->tenantUrl('/assignments/'.$assignmentId))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Assignments/Show')
+                ->where('assignment.overall_max_score', 20)
+                ->has('assignment.submissions', 1)
+                ->where('assignment.submissions.0.score', fn ($score) => (float) $score === 8.0)
+                ->where('assignment.submissions.0.answered_count', 1)
+                ->has('assignment.submissions.0.question_grades', 2)
+                ->where('assignment.submissions.0.question_grades.0.score', 8)
+                ->where('assignment.submissions.0.question_grades.0.max_score', 10)
+                ->where('assignment.submissions.0.question_grades.1.score', null)
+                ->where('assignment.submissions.0.question_grades.1.max_score', 10)
+                ->where('assignment.submissions.0.question_grades.1.captured', false)
+            );
+    }
+
+    public function test_teachers_can_release_grades_to_students(): void
+    {
+        $tenant = $this->initializeTenant();
+        $teacher = User::factory()->create();
+        $student = User::factory()->student()->create(['name' => 'Jordan Lee']);
+        $assignmentId = $this->createAssignmentFor($teacher);
+        $submissionId = $this->joinAndSubmit(
+            $student,
+            $assignmentId,
+            'The war began with the abduction of Helen.'
+        );
+
+        $this->fakeAssessmentResponse();
+
+        $this->actingAs($teacher)
+            ->postJson($this->tenantUrl('/submissions/'.$submissionId.'/assess'), [
+                'submission_id' => $submissionId,
+            ])
+            ->assertCreated();
+
+        $this->actingAs($teacher)
+            ->from($this->tenantUrl('/assignments/'.$assignmentId))
+            ->post($this->tenantUrl('/assignments/'.$assignmentId.'/release-grades'))
+            ->assertRedirect($this->tenantUrl('/assignments/'.$assignmentId))
+            ->assertSessionHas('status', 'Grades are now visible to students.');
+
+        $tenant->run(function () use ($assignmentId) {
+            $assignment = Assignment::query()->find($assignmentId);
+
+            $this->assertNotNull($assignment?->grades_released_at);
+        });
+
+        $this->actingAs($teacher)
+            ->get($this->tenantUrl('/assignments/'.$assignmentId))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Assignments/Show')
+                ->where('assignment.grades_released_at', fn ($value) => is_string($value) && $value !== '')
+            );
+
+        $this->actingAs($student)
+            ->get($this->tenantUrl('/student'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Student/Home')
+                ->where('assignments.0.status', 'graded')
+                ->where('assignments.0.score', 8)
+            );
+
+        $this->actingAs($student)
+            ->get($this->tenantUrl('/student/assignments/'.$assignmentId))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Student/Assignment')
+                ->where('assignment.grades_released', true)
+                ->where('submission.status', 'graded')
+                ->where('submission.score', 8)
+                ->has('submission.question_grades', 1)
+                ->where('submission.question_grades.0.score', 8)
+            );
+
+        $this->actingAs($teacher)
+            ->from($this->tenantUrl('/assignments/'.$assignmentId))
+            ->post($this->tenantUrl('/assignments/'.$assignmentId.'/hide-grades'))
+            ->assertRedirect($this->tenantUrl('/assignments/'.$assignmentId));
+
+        $this->actingAs($student)
+            ->get($this->tenantUrl('/student'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Student/Home')
+                ->where('assignments.0.status', 'pending')
+                ->where('assignments.0.score', null)
+            );
+    }
+
+    public function test_students_cannot_release_grades(): void
+    {
+        $teacher = User::factory()->create();
+        $student = User::factory()->student()->create();
+        $assignmentId = $this->createAssignmentFor($teacher);
+
+        $this->actingAs($student)
+            ->post($this->tenantUrl('/assignments/'.$assignmentId.'/release-grades'))
+            ->assertNotFound();
+    }
+
+    public function test_other_teachers_cannot_release_grades(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $assignmentId = $this->createAssignmentFor($owner);
+
+        $this->actingAs($other)
+            ->post($this->tenantUrl('/assignments/'.$assignmentId.'/release-grades'))
+            ->assertNotFound();
     }
 
     public function test_teacher_can_ocr_a_photo_before_choosing_a_student(): void
@@ -655,6 +865,55 @@ class AssignmentGradingTest extends TestCase
         $tenant->run(function () use ($assignmentId) {
             $this->assertSame(0, Submission::query()->where('assignment_id', $assignmentId)->count());
         });
+    }
+
+    public function test_teacher_can_ocr_a_photo_for_all_questions(): void
+    {
+        $tenant = $this->initializeTenant();
+        $teacher = User::factory()->create();
+        $assignmentId = $this->createAssignmentFor($teacher, [
+            'question' => null,
+            'questions' => [
+                ['prompt' => 'Explain the causes of the Trojan War.'],
+                ['prompt' => "What does Hector's death reveal about honor?"],
+            ],
+        ]);
+        $questionIds = $tenant->run(
+            fn () => Question::query()
+                ->where('assignment_id', $assignmentId)
+                ->orderBy('order')
+                ->pluck('id')
+                ->all()
+        );
+
+        OpenAI::fake([
+            CreateResponse::fake([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'answers' => [
+                                    ['question_number' => 1, 'text' => 'Paris abducted Helen.'],
+                                    ['question_number' => 2, 'text' => 'Hector dies defending Troy.'],
+                                ],
+                            ]),
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
+
+        $this->actingAs($teacher)
+            ->post($this->tenantUrl('/assignments/'.$assignmentId.'/paper-ocr'), [
+                'all_questions' => true,
+                'image' => UploadedFile::fake()->image('paper.jpg', 40, 40),
+            ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('answers.0.question_id', $questionIds[0])
+            ->assertJsonPath('answers.0.text', 'Paris abducted Helen.')
+            ->assertJsonPath('answers.1.question_id', $questionIds[1])
+            ->assertJsonPath('answers.1.text', 'Hector dies defending Troy.');
     }
 
     public function test_teacher_can_create_a_walk_in_paper_from_ocr(): void
@@ -728,10 +987,24 @@ class AssignmentGradingTest extends TestCase
                 'user_id' => $student->id,
             ])
             ->assertOk()
-            ->assertJsonPath('submission_id', $submissionId);
+            ->assertJsonPath('submission_id', $submissionId)
+            ->assertJsonPath('requires_override', true);
 
         $this->actingAs($teacher)
             ->putJson($this->tenantUrl('/assignments/'.$assignmentId.'/paper-submissions/'.$submissionId), [
+                'answers' => [
+                    [
+                        'question_id' => $questionId,
+                        'response' => 'The photographed paper replaces the typed answer.',
+                    ],
+                ],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('override');
+
+        $this->actingAs($teacher)
+            ->putJson($this->tenantUrl('/assignments/'.$assignmentId.'/paper-submissions/'.$submissionId), [
+                'override' => true,
                 'answers' => [
                     [
                         'question_id' => $questionId,
@@ -750,6 +1023,7 @@ class AssignmentGradingTest extends TestCase
                 ->has('assignment.students', 1)
                 ->where('assignment.students.0.id', $student->id)
                 ->where('assignment.students.0.name', 'Jordan Lee')
+                ->where('assignment.students.0.submission.status', 'pending')
                 ->where('assignment.submissions.0.student_name', 'Jordan Lee')
                 ->where('assignment.submissions.0.source', 'app')
                 ->where(
@@ -757,6 +1031,73 @@ class AssignmentGradingTest extends TestCase
                     'The photographed paper replaces the typed answer.'
                 )
             );
+    }
+
+    public function test_photographing_a_graded_student_requires_override_and_clears_the_grade(): void
+    {
+        $tenant = $this->initializeTenant();
+        $teacher = User::factory()->create();
+        $student = User::factory()->student()->create(['name' => 'Jordan Lee']);
+        $assignmentId = $this->createAssignmentFor($teacher);
+        $submissionId = $this->joinAndSubmit(
+            $student,
+            $assignmentId,
+            'The war began with the abduction of Helen.'
+        );
+        $questionId = $tenant->run(
+            fn () => Question::query()->where('assignment_id', $assignmentId)->value('id')
+        );
+
+        $this->fakeAssessmentResponse();
+
+        $this->actingAs($teacher)
+            ->postJson($this->tenantUrl('/submissions/'.$submissionId.'/assess'), [
+                'submission_id' => $submissionId,
+            ])
+            ->assertCreated();
+
+        $this->actingAs($teacher)
+            ->postJson($this->tenantUrl('/assignments/'.$assignmentId.'/paper-submissions'), [
+                'user_id' => $student->id,
+            ])
+            ->assertOk()
+            ->assertJsonPath('requires_override', true)
+            ->assertJsonPath('status', 'graded');
+
+        $this->actingAs($teacher)
+            ->putJson($this->tenantUrl('/assignments/'.$assignmentId.'/paper-submissions/'.$submissionId), [
+                'answers' => [
+                    [
+                        'question_id' => $questionId,
+                        'response' => 'A photographed replacement.',
+                    ],
+                ],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('override');
+
+        $this->actingAs($teacher)
+            ->putJson($this->tenantUrl('/assignments/'.$assignmentId.'/paper-submissions/'.$submissionId), [
+                'override' => true,
+                'answers' => [
+                    [
+                        'question_id' => $questionId,
+                        'response' => 'A photographed replacement.',
+                    ],
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'pending');
+
+        $tenant->run(function () use ($submissionId, $questionId) {
+            $submission = Submission::query()->find($submissionId);
+
+            $this->assertNotNull($submission);
+            $this->assertSame('pending', $submission->status);
+            $this->assertNull($submission->score);
+            $this->assertSame(0, $submission->scores()->count());
+            $this->assertSame('A photographed replacement.', $submission->answerFor($questionId));
+        });
     }
 
     public function test_students_cannot_create_paper_submissions(): void

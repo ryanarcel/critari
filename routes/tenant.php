@@ -37,6 +37,12 @@ Route::middleware([InitializeTenancyBySubdomain::class, PreventAccessFromCentral
         Route::get('/assignments/{assignment}', [AssignmentController::class, 'show'])
             ->middleware('auth')
             ->name('assignments.show');
+        Route::post('/assignments/{assignment}/release-grades', [AssignmentController::class, 'releaseGrades'])
+            ->middleware('auth')
+            ->name('assignments.release-grades');
+        Route::post('/assignments/{assignment}/hide-grades', [AssignmentController::class, 'hideGrades'])
+            ->middleware('auth')
+            ->name('assignments.hide-grades');
         Route::resource('assignments', AssignmentController::class)->except(['create', 'show']);
         Route::resource('submissions', SubmissionController::class);
         Route::post('/submissions/{submission}/assess', [SubmissionController::class, 'processAIAssessment'])

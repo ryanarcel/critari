@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Assignment;
+use App\Models\CriterionScore;
 use App\Models\Question;
 use App\Models\Submission;
 use App\Models\User;
@@ -48,6 +49,9 @@ class PaperSubmissionController extends Controller
                     'success' => true,
                     'submission_id' => $submission->id,
                     'student_name' => $student->name,
+                    'status' => $submission->status,
+                    'score' => $submission->score !== null ? (float) $submission->score : null,
+                    'requires_override' => $submission->hasSubmittedResponse(),
                     'answers' => $this->answersFrom($submission),
                 ]);
             }
@@ -116,14 +120,48 @@ class PaperSubmissionController extends Controller
     }
 
     /**
-     * Run OCR on an uploaded photo for one assignment question.
+     * Run OCR on an uploaded photo for one question or every question.
      */
     private function transcribePhoto(Request $request, Assignment $assignment): JsonResponse
     {
         $validated = $request->validate([
-            'question_id' => 'required|integer|exists:questions,id',
+            'question_id' => 'required_without:all_questions|nullable|integer|exists:questions,id',
+            'all_questions' => 'sometimes|boolean',
             'image' => 'required|file|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
+
+        $assignment->load('questions');
+
+        if ($request->boolean('all_questions')) {
+            $questions = $assignment->questions
+                ->map(fn (Question $question): array => [
+                    'id' => $question->id,
+                    'prompt' => $question->prompt,
+                ])
+                ->values()
+                ->all();
+
+            try {
+                $answers = $this->ocr->transcribeAnswers($validated['image'], $questions);
+            } catch (\Exception $e) {
+                Log::error('Paper OCR Failure: '.$e->getMessage());
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Could not read the photo. Try another picture.',
+                ], 500);
+            }
+
+            return response()->json([
+                'success' => true,
+                'answers' => collect($answers)
+                    ->map(fn (string $text, int $questionId): array => [
+                        'question_id' => $questionId,
+                        'text' => $text,
+                    ])
+                    ->values(),
+            ]);
+        }
 
         $question = Question::query()->findOrFail($validated['question_id']);
 
@@ -164,7 +202,14 @@ class PaperSubmissionController extends Controller
             'answers.*.question_id' => 'required|integer|exists:questions,id',
             'answers.*.response' => 'nullable|string',
             'student_name' => 'nullable|string|max:255',
+            'override' => 'sometimes|boolean',
         ]);
+
+        if ($submission->hasSubmittedResponse() && ! $request->boolean('override')) {
+            throw ValidationException::withMessages([
+                'override' => 'This student already submitted a response. Confirm to replace it and override any grades.',
+            ]);
+        }
 
         $assignment->load('questions');
         $questionIds = $assignment->questions->pluck('id');
@@ -201,6 +246,7 @@ class PaperSubmissionController extends Controller
         ];
 
         if ($submission->status === 'graded') {
+            CriterionScore::query()->where('submission_id', $submission->id)->delete();
             $updates['status'] = 'pending';
             $updates['score'] = null;
             $updates['graded_at'] = null;

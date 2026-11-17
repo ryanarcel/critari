@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import PaperCapturePanel from '@/Components/PaperCapturePanel.vue';
 
@@ -13,6 +13,7 @@ interface QuestionGrade {
     question_id: number | null;
     prompt: string | null;
     response: string;
+    captured?: boolean;
     score: number | string | null;
     max_score: number | null;
     overall_feedback: string | null;
@@ -38,13 +39,19 @@ interface AssignmentShow {
     join_code: string | null;
     max_score: number | null;
     overall_max_score: number | null;
+    grades_released_at: string | null;
     questions: { id: number; prompt: string }[];
     criteria: { id: number; name: string }[];
-    students: { id: number; name: string }[];
+    students: {
+        id: number;
+        name: string;
+        submission?: { status: string; score: number | string | null; source?: string | null } | null;
+    }[];
     submissions: Paper[];
 }
 
 const props = defineProps<{
+    status?: string | null;
     user: { name: string };
     assignment: AssignmentShow;
 }>();
@@ -58,6 +65,14 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const captureOpen = ref(false);
 const photoFile = ref<File | null>(null);
 const photoKey = ref(0);
+
+const startPhotograph = () => {
+    captureOpen.value = true;
+
+    if (props.assignment.questions.length < 2) {
+        fileInput.value?.click();
+    }
+};
 
 const openCamera = () => {
     fileInput.value?.click();
@@ -96,6 +111,14 @@ const formatScore = (value: number | string | null) => {
     return Number.isFinite(numeric) ? numeric : value;
 };
 
+const isCaptured = (grade: QuestionGrade) =>
+    grade.captured ?? (grade.response ?? '').trim() !== '';
+
+const assignmentMaxScore = computed(() => props.assignment.overall_max_score);
+
+const gradeValue = (grade: QuestionGrade) =>
+    isCaptured(grade) ? grade.score : 0;
+
 const copyCode = async () => {
     if (!props.assignment.join_code) {
         return;
@@ -133,6 +156,40 @@ const gradePaper = (paper: Paper) => {
         });
 };
 
+const gradesReleased = computed(() => props.assignment.grades_released_at !== null);
+const gradedCount = computed(
+    () => props.assignment.submissions.filter((paper) => paper.status === 'graded').length,
+);
+const updatingGrades = ref(false);
+
+const releaseGrades = () => {
+    if (updatingGrades.value) {
+        return;
+    }
+
+    updatingGrades.value = true;
+    router.post(route('assignments.release-grades', props.assignment.id), {}, {
+        preserveScroll: true,
+        onFinish: () => {
+            updatingGrades.value = false;
+        },
+    });
+};
+
+const hideGrades = () => {
+    if (updatingGrades.value) {
+        return;
+    }
+
+    updatingGrades.value = true;
+    router.post(route('assignments.hide-grades', props.assignment.id), {}, {
+        preserveScroll: true,
+        onFinish: () => {
+            updatingGrades.value = false;
+        },
+    });
+};
+
 const logout = () => {
     router.post(route('tenant.logout'));
 };
@@ -150,27 +207,31 @@ const logout = () => {
                     </Link>
                     <Link
                         :href="route('dashboard')"
-                        class="text-sm font-medium text-slate-600 hover:text-slate-900"
+                        class="inline-flex h-11 items-center text-sm font-medium leading-none text-slate-600 hover:text-slate-900"
                     >
                         Dashboard
                     </Link>
                 </div>
-                <div class="flex items-center gap-3 sm:gap-4">
-                    <span class="hidden max-w-[8rem] truncate text-sm text-slate-600 sm:inline">{{
+                <nav class="flex shrink-0 items-center gap-3 sm:gap-4">
+                    <span class="hidden max-w-[8rem] truncate text-sm leading-none text-slate-600 sm:inline">{{
                         user.name
                     }}</span>
                     <button
                         type="button"
-                        class="min-h-11 text-sm font-medium text-slate-600 hover:text-slate-900"
+                        class="inline-flex h-11 items-center text-sm font-medium leading-none text-slate-600 hover:text-slate-900"
                         @click="logout"
                     >
                         Sign out
                     </button>
-                </div>
+                </nav>
             </div>
         </header>
 
         <main class="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:space-y-8 sm:px-6 sm:py-10">
+            <p v-if="status" class="rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
+                {{ status }}
+            </p>
+
             <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
                 <div>
                     <p class="text-sm text-slate-500">Assignment</p>
@@ -227,6 +288,40 @@ const logout = () => {
                 </p>
             </section>
 
+            <section class="rounded-lg bg-white p-4 shadow-sm sm:p-6">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h2 class="text-lg font-semibold text-slate-900">Student grades</h2>
+                        <p v-if="gradesReleased" class="mt-1 text-sm text-slate-500">
+                            Students can see their scores and feedback.
+                            {{ gradedCount }} of {{ assignment.submissions.length }} papers graded.
+                        </p>
+                        <p v-else class="mt-1 text-sm text-slate-500">
+                            Students cannot see scores until you release them.
+                            {{ gradedCount }} of {{ assignment.submissions.length }} papers graded.
+                        </p>
+                    </div>
+                    <button
+                        v-if="gradesReleased"
+                        type="button"
+                        :disabled="updatingGrades"
+                        class="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                        @click="hideGrades"
+                    >
+                        {{ updatingGrades ? 'Updating...' : 'Hide grades' }}
+                    </button>
+                    <button
+                        v-else
+                        type="button"
+                        :disabled="updatingGrades"
+                        class="min-h-11 w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                        @click="releaseGrades"
+                    >
+                        {{ updatingGrades ? 'Releasing...' : 'Release grades' }}
+                    </button>
+                </div>
+            </section>
+
             <p v-if="errorMessage" class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
                 {{ errorMessage }}
             </p>
@@ -236,15 +331,15 @@ const logout = () => {
                     <div>
                         <h2 class="text-lg font-semibold text-slate-900">Student papers</h2>
                         <p class="mt-1 text-sm text-slate-500">
-                            Students can type in the app, or you can photograph a paper.
+                            Students can type in the app, or you can photograph a submission.
                         </p>
                     </div>
                     <button
                         type="button"
                         class="min-h-11 w-full rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 sm:w-auto"
-                        @click="openCamera"
+                        @click="startPhotograph"
                     >
-                        Photograph a paper
+                        Photograph a Submission
                     </button>
                     <input
                         id="paper-photo"
@@ -272,12 +367,12 @@ const logout = () => {
 
                 <p v-if="assignment.submissions.length === 0" class="mt-3 text-sm text-slate-500">
                     No student papers yet. Share the code so students can join and submit, or
-                    photograph a paper.
+                    photograph a submission.
                 </p>
                 <ul v-else class="mt-4 divide-y divide-slate-200">
                     <li v-for="paper in assignment.submissions" :key="paper.id" class="py-4">
                         <div class="flex flex-wrap items-start justify-between gap-3">
-                            <div>
+                            <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <p class="font-medium text-slate-900">{{ paper.student_name }}</p>
                                     <span
@@ -288,17 +383,21 @@ const logout = () => {
                                 </div>
                                 <p class="text-sm text-slate-500">
                                     <span class="capitalize">{{ paper.status }}</span>
-                                    <span v-if="paper.status === 'graded' && paper.score !== null">
-                                        · {{ formatScore(paper.score) }} /
-                                        {{ assignment.overall_max_score }}
-                                    </span>
                                     <span v-if="assignment.questions.length > 0">
                                         · {{ paper.answered_count }} of
                                         {{ assignment.questions.length }} questions captured
                                     </span>
                                 </p>
                             </div>
-                            <div class="flex w-full items-center gap-3 sm:w-auto">
+                            <div class="flex w-full flex-wrap items-center gap-3 sm:w-auto sm:flex-nowrap">
+                                <p
+                                    v-if="paper.status === 'graded' && paper.score !== null"
+                                    class="inline-flex min-h-11 items-center rounded-lg bg-indigo-50 px-3 py-1.5 text-base font-bold tabular-nums tracking-tight text-indigo-700 ring-1 ring-inset ring-indigo-200"
+                                >
+                                    {{ formatScore(paper.score) }}
+                                    <span class="mx-1 font-semibold text-indigo-400">/</span>
+                                    {{ assignmentMaxScore }}
+                                </p>
                                 <button
                                     type="button"
                                     class="min-h-11 text-sm font-medium text-slate-600 hover:text-slate-900"
@@ -336,26 +435,40 @@ const logout = () => {
                                         </span>
                                         <span v-else>Student response</span>
                                     </p>
-                                    <p
+                                    <div
                                         v-if="paper.status === 'graded'"
-                                        class="text-sm font-semibold text-indigo-600"
+                                        class="flex shrink-0 flex-col items-end gap-1"
                                     >
-                                        {{ formatScore(grade.score) }} / {{ grade.max_score }}
-                                    </p>
+                                        <p
+                                            class="inline-flex items-center rounded-md px-2 py-1 text-sm font-bold tabular-nums"
+                                            :class="
+                                                isCaptured(grade)
+                                                    ? 'bg-indigo-50 text-indigo-700'
+                                                    : 'bg-slate-100 text-slate-500'
+                                            "
+                                        >
+                                            {{ formatScore(gradeValue(grade)) }}
+                                            <span class="mx-1 font-medium opacity-60">/</span>
+                                            {{ grade.max_score }}
+                                        </p>
+                                        <p v-if="!isCaptured(grade)" class="text-xs font-medium text-slate-400">
+                                            Not captured
+                                        </p>
+                                    </div>
                                 </div>
                                 <div
                                     class="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm leading-relaxed text-slate-700"
                                 >
-                                    {{ grade.response }}
+                                    {{ grade.response || 'No answer captured for this question.' }}
                                 </div>
                                 <p
-                                    v-if="paper.status === 'graded' && grade.overall_feedback"
+                                    v-if="paper.status === 'graded' && isCaptured(grade) && grade.overall_feedback"
                                     class="text-sm text-slate-700"
                                 >
                                     {{ grade.overall_feedback }}
                                 </p>
                                 <div
-                                    v-for="(score, index) in grade.scores"
+                                    v-for="(score, index) in isCaptured(grade) ? grade.scores : []"
                                     :key="index"
                                     class="rounded-lg border border-slate-200 p-3"
                                 >

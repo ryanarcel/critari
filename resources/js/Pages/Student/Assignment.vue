@@ -16,6 +16,7 @@ const props = defineProps<{
         title: string;
         max_score: number | null;
         overall_max_score: number | null;
+        grades_released: boolean;
         questions: { id: number; prompt: string; response: string }[];
     };
     submission: {
@@ -25,6 +26,7 @@ const props = defineProps<{
             question_id: number | null;
             prompt: string | null;
             response: string;
+            captured?: boolean;
             score: number | string | null;
             max_score: number | null;
             overall_feedback: string | null;
@@ -34,6 +36,17 @@ const props = defineProps<{
 }>();
 
 const isGraded = computed(() => props.submission?.status === 'graded');
+const gradesVisible = computed(
+    () => isGraded.value && props.assignment.grades_released && props.submission !== null,
+);
+
+const isCaptured = (grade: { captured?: boolean; response: string }) =>
+    grade.captured ?? grade.response.trim() !== '';
+
+const visibleMaxScore = computed(() => props.assignment.overall_max_score);
+
+const gradeValue = (grade: { captured?: boolean; response: string; score: number | string | null }) =>
+    isCaptured(grade) ? grade.score : 0;
 
 const form = useForm({
     answers: props.assignment.questions.map((question) => ({
@@ -77,25 +90,25 @@ const logout = () => {
 
     <div class="min-h-screen bg-slate-50">
         <header class="border-b border-slate-200 bg-white">
-            <div class="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3 sm:py-4">
-                <Link href="/" class="text-xl font-black tracking-tight text-slate-900">
+            <div class="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3 sm:py-4">
+                <Link href="/" class="shrink-0 text-xl font-black leading-none tracking-tight text-slate-900">
                     critari<span class="text-indigo-600">.</span>
                 </Link>
-                <div class="flex items-center space-x-4">
+                <nav class="flex shrink-0 items-center gap-4 sm:gap-6">
                     <Link
                         :href="route('student.home')"
-                        class="min-h-11 text-sm font-medium text-slate-600 hover:text-slate-900"
+                        class="inline-flex h-11 items-center text-sm font-medium leading-none text-slate-600 hover:text-slate-900"
                     >
                         Assignments
                     </Link>
                     <button
                         type="button"
-                        class="min-h-11 text-sm font-medium text-slate-600 hover:text-slate-900"
+                        class="inline-flex h-11 items-center text-sm font-medium leading-none text-slate-600 hover:text-slate-900"
                         @click="logout"
                     >
                         Sign out
                     </button>
-                </div>
+                </nav>
             </div>
         </header>
 
@@ -108,6 +121,13 @@ const logout = () => {
                 <p class="text-sm text-slate-500">Assignment</p>
                     <h1 class="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl">{{ assignment.title }}</h1>
             </div>
+
+            <p
+                v-if="isGraded && !gradesVisible"
+                class="rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-700"
+            >
+                Your answers were submitted. Grades will appear here when your teacher releases them.
+            </p>
 
             <p v-if="form.errors.answers" class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
                 {{ form.errors.answers }}
@@ -152,11 +172,17 @@ const logout = () => {
                 </div>
             </form>
 
-            <section v-if="isGraded && submission" class="space-y-4 rounded-lg bg-white p-4 shadow-sm sm:p-6">
-                <h2 class="text-lg font-semibold text-slate-900">
-                    Score: {{ formatScore(submission.score) }} /
-                    {{ assignment.overall_max_score }}
-                </h2>
+            <section v-if="gradesVisible && submission" class="space-y-4 rounded-lg bg-white p-4 shadow-sm sm:p-6">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <h2 class="text-lg font-semibold text-slate-900">Your score</h2>
+                    <p
+                        class="inline-flex items-center rounded-lg bg-indigo-600 px-3 py-1.5 text-lg font-bold tabular-nums text-white"
+                    >
+                        {{ formatScore(submission.score) }}
+                        <span class="mx-1 font-medium text-indigo-200">/</span>
+                        {{ visibleMaxScore }}
+                    </p>
+                </div>
                 <div
                     v-for="(grade, gradeIndex) in submission.question_grades"
                     :key="grade.question_id ?? `paper-${gradeIndex}`"
@@ -169,9 +195,23 @@ const logout = () => {
                             </span>
                             <span v-else>Your response</span>
                         </p>
-                        <p class="text-sm font-semibold text-indigo-600">
-                            {{ formatScore(grade.score) }} / {{ grade.max_score }}
-                        </p>
+                        <div class="flex shrink-0 flex-col items-end gap-1">
+                            <p
+                                class="inline-flex items-center rounded-md px-2 py-1 text-sm font-bold tabular-nums"
+                                :class="
+                                    isCaptured(grade)
+                                        ? 'bg-indigo-50 text-indigo-700'
+                                        : 'bg-slate-100 text-slate-500'
+                                "
+                            >
+                                {{ formatScore(gradeValue(grade)) }}
+                                <span class="mx-1 font-medium opacity-60">/</span>
+                                {{ grade.max_score }}
+                            </p>
+                            <p v-if="!isCaptured(grade)" class="text-xs font-medium text-slate-400">
+                                Not captured
+                            </p>
+                        </div>
                     </div>
                     <p v-if="grade.overall_feedback" class="text-sm text-slate-700">
                         {{ grade.overall_feedback }}

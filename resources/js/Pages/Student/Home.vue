@@ -58,20 +58,20 @@ const logout = () => {
 
     <div class="min-h-screen bg-slate-50">
         <header class="border-b border-slate-200 bg-white">
-            <div class="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3 sm:py-4">
-                <Link href="/" class="text-xl font-black tracking-tight text-slate-900">
+            <div class="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3 sm:py-4">
+                <Link href="/" class="shrink-0 text-xl font-black leading-none tracking-tight text-slate-900">
                     critari<span class="text-indigo-600">.</span>
                 </Link>
-                <div class="flex items-center space-x-4">
-                    <span v-if="user.name" class="hidden max-w-[8rem] truncate text-sm text-slate-600 sm:inline">{{ user.name }}</span>
+                <nav class="flex shrink-0 items-center gap-4 sm:gap-6">
+                    <span v-if="user.name" class="hidden max-w-[8rem] truncate text-sm leading-none text-slate-600 sm:inline">{{ user.name }}</span>
                     <button
                         type="button"
-                        class="min-h-11 text-sm font-medium text-slate-600 hover:text-slate-900"
+                        class="inline-flex h-11 items-center text-sm font-medium leading-none text-slate-600 hover:text-slate-900"
                         @click="logout"
                     >
                         Sign out
                     </button>
-                </div>
+                </nav>
             </div>
         </header>
 
@@ -117,7 +117,7 @@ const logout = () => {
                 <ul v-else class="mt-4 divide-y divide-slate-200">
                     <li v-for="assignment in assignments" :key="assignment.id" class="py-4">
                         <div class="flex flex-wrap items-center justify-between gap-3">
-                            <div>
+                            <div class="min-w-0 flex-1">
                                 <Link
                                     :href="route('student.assignments.show', assignment.id)"
                                     class="font-medium text-indigo-600 hover:text-indigo-700"
@@ -126,20 +126,24 @@ const logout = () => {
                                 </Link>
                                 <p class="text-sm text-slate-500">
                                     {{ statusLabel(assignment.status) }}
-                                    <span
-                                        v-if="assignment.status === 'graded' && assignment.score !== null"
-                                    >
-                                        · {{ formatScore(assignment.score) }} /
-                                        {{ assignment.overall_max_score }}
-                                    </span>
                                 </p>
                             </div>
-                            <Link
-                                :href="route('student.assignments.show', assignment.id)"
-                                class="min-h-11 text-sm font-medium text-slate-600 hover:text-slate-900"
-                            >
-                                Open
-                            </Link>
+                            <div class="flex items-center gap-3">
+                                <p
+                                    v-if="assignment.status === 'graded' && assignment.score !== null"
+                                    class="inline-flex min-h-11 items-center rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-bold tabular-nums text-white"
+                                >
+                                    {{ formatScore(assignment.score) }}
+                                    <span class="mx-1 font-medium text-indigo-200">/</span>
+                                    {{ assignment.overall_max_score }}
+                                </p>
+                                <Link
+                                    :href="route('student.assignments.show', assignment.id)"
+                                    class="min-h-11 text-sm font-medium text-slate-600 hover:text-slate-900"
+                                >
+                                    Open
+                                </Link>
+                            </div>
                         </div>
                     </li>
                 </ul>

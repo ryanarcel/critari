@@ -23,12 +23,12 @@ abstract class TestCase extends BaseTestCase
         if (! $tenant) {
             try {
                 $tenant = Tenant::create(['id' => $this->tenantId]);
-                $tenant->domains()->create(['domain' => $this->tenantId]);
             } catch (TenantDatabaseAlreadyExistsException) {
                 $tenant = Tenant::withoutEvents(fn () => Tenant::create(['id' => $this->tenantId]));
-                $tenant->domains()->firstOrCreate(['domain' => $this->tenantId]);
             }
         }
+
+        $tenant->domains()->firstOrCreate(['domain' => $this->tenantId]);
 
         Tenancy::initialize($tenant);
 
@@ -36,6 +36,7 @@ abstract class TestCase extends BaseTestCase
             || Schema::hasColumn('assignments', 'description')
             || ! Schema::hasColumn('users', 'role')
             || ! Schema::hasColumn('assignments', 'join_code')
+            || ! Schema::hasColumn('assignments', 'grades_released_at')
             || ! Schema::hasColumn('criterion_scores', 'question_id')) {
             $this->artisan('tenants:migrate', [
                 '--tenants' => [$this->tenantId],

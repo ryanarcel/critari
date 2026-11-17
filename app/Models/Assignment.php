@@ -19,6 +19,7 @@ class Assignment extends Model
         'created_by',
         'join_code',
         'due_at',
+        'grades_released_at',
     ];
 
     protected $casts = [
@@ -28,6 +29,7 @@ class Assignment extends Model
         'max_score' => 'integer',
         'levels' => 'array',
         'due_at' => 'datetime',
+        'grades_released_at' => 'datetime',
     ];
 
     /**
@@ -140,6 +142,11 @@ class Assignment extends Model
         return $this->belongsToMany(User::class)
             ->withPivot('role', 'assigned_at')
             ->withTimestamps();
+    }
+
+    public function gradesReleased(): bool
+    {
+        return $this->grades_released_at !== null;
     }
 
     public function ownedBy(?User $user): bool

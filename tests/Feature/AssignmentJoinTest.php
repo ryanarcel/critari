@@ -148,7 +148,17 @@ class AssignmentJoinTest extends TestCase
                     ['question_id' => $questionId, 'response' => 'Paris abducted Helen.'],
                 ],
             ])
-            ->assertRedirect($this->tenantUrl('/student/assignments/'.$assignmentId));
+            ->assertRedirect($this->tenantUrl('/student'))
+            ->assertSessionHas('status', 'Your answers were submitted.');
+
+        $this->actingAs($student)
+            ->get($this->tenantUrl('/student'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Student/Home')
+                ->where('assignments.0.status', 'pending')
+                ->where('assignments.0.score', null)
+            );
 
         $this->actingAs($student)
             ->get($this->tenantUrl('/student/assignments/'.$assignmentId))
