@@ -328,6 +328,38 @@ class AssignmentGradingTest extends TestCase
         });
     }
 
+    public function test_grading_maps_criterion_names_without_exact_casing(): void
+    {
+        $tenant = $this->initializeTenant();
+        $teacher = User::factory()->create();
+        $student = User::factory()->student()->create(['name' => 'Jordan Lee']);
+        $assignmentId = $this->createAssignmentFor($teacher);
+        $submissionId = $this->joinAndSubmit(
+            $student,
+            $assignmentId,
+            'The war began with the abduction of Helen.'
+        );
+
+        $this->fakeAssessmentResponse('IDEA EXPLANATION');
+
+        $this->actingAs($teacher)
+            ->postJson($this->tenantUrl('/submissions/'.$submissionId.'/assess'), [
+                'submission_id' => $submissionId,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('total_score', 8)
+            ->assertJsonPath('scores.0.criterion_name', 'Idea explanation');
+
+        $tenant->run(function () use ($submissionId) {
+            $submission = Submission::query()->with('scores.criterion')->find($submissionId);
+
+            $this->assertNotNull($submission);
+            $this->assertEquals(1, $submission->scores->count());
+            $this->assertSame('Idea explanation', $submission->scores->first()->criterion->name);
+            $this->assertEquals(8, $submission->scores->first()->score);
+        });
+    }
+
     public function test_regrading_replaces_previous_criterion_scores(): void
     {
         $tenant = $this->initializeTenant();

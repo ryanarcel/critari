@@ -532,9 +532,10 @@ onBeforeUnmount(() => {
                             v-model="currentText"
                             rows="7"
                             class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm leading-relaxed text-slate-900"
-                            placeholder="Review and edit the transcribed answer."
+                            placeholder="Confirm this transcription before grading."
                         />
                         <p class="mt-1 text-xs text-slate-500">
+                            This is a draft from the photo. Edit it if the reading is wrong, then grade.
                             {{ answeredCount }} of {{ questions.length }} questions captured
                         </p>
                     </div>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Assignment;
+use App\Models\Criterion;
 use App\Models\CriterionScore;
 use App\Models\Question;
 use App\Models\Submission;
@@ -189,20 +190,13 @@ class SubmissionController extends Controller
                 $questionId = $target['question']?->id;
                 $questionFeedback[$questionId ?? 'paper'] = $data['overall_feedback'] ?? '';
 
-                foreach ($data['scores'] as $scoreData) {
-                    $criterion = $assignment->criteria
-                        ->firstWhere('name', $scoreData['criterion_name']);
-
-                    if (! $criterion) {
-                        continue;
-                    }
-
+                foreach ($this->scoresForCriteria($assignment, $data['scores'] ?? []) as $scoreData) {
                     $persistedScores[] = [
                         'question_id' => $questionId,
-                        'criterion_id' => $criterion->id,
-                        'criterion_name' => $criterion->name,
+                        'criterion_id' => $scoreData['criterion_id'],
+                        'criterion_name' => $scoreData['criterion_name'],
                         'score' => $scoreData['score'],
-                        'feedback' => $scoreData['feedback'] ?? '',
+                        'feedback' => $scoreData['feedback'],
                     ];
                 }
             }
@@ -304,38 +298,19 @@ class SubmissionController extends Controller
      */
     private function gradeResponseWithAi(Assignment $assignment, string $prompt, string $studentResponse): array
     {
-        $criteriaList = $assignment->criteria
-            ->map(function ($criterion) {
-                $line = "- {$criterion->name}";
+        $levels = $this->assignmentLevels($assignment);
+        $maxScorePerCriterion = $this->maxScorePerCriterion($levels);
+        $criterionNames = $assignment->criteria->pluck('name')->filter()->values()->all();
+        $namesJson = json_encode($criterionNames, JSON_UNESCAPED_UNICODE);
+        $rubricMatrix = $this->formattedRubricMatrix($assignment, $levels);
 
-                if (filled($criterion->description)) {
-                    $line .= ": {$criterion->description}";
-                }
-
-                return $line;
-            })
-            ->implode("\n");
-
-        $levels = is_array($assignment->levels) ? $assignment->levels : json_decode($assignment->levels, true);
-        $levelsFormatted = collect($levels)
-            ->map(fn ($level) => "{$level['name']}: {$level['range']} pts")
-            ->implode(', ');
-
-        $maxLevel = end($levels);
-        $rangeString = $maxLevel['range'] ?? '0-0';
-        $rangeParts = explode('-', $rangeString);
-        $maxScorePerCriterion = (int) end($rangeParts);
-
-        $aiPrompt = "You are an expert academic assessor. Grade the following student response against the provided criteria.
+        $aiPrompt = "You are an expert academic assessor. Grade the student response using only the rubric matrix below.
 
                     ASSIGNMENT QUESTION:
                     {$prompt}
 
-                    GRADING LEVELS:
-                    {$levelsFormatted}
-
-                    CRITERIA TO GRADE:
-                    {$criteriaList}
+                    RUBRIC MATRIX:
+                    {$rubricMatrix}
 
                     STUDENT RESPONSE:
                     \"{$studentResponse}\"
@@ -353,7 +328,8 @@ class SubmissionController extends Controller
                         \"overall_feedback\": \"Brief summary of the assessment\"
                     }
 
-                    Assign scores (0-{$maxScorePerCriterion}) for each criterion based on the performance levels provided above. For each criterion, explain the reasoning for the score and cite specific evidence from the student response.";
+                    Use these criterion_name values exactly, one score per criterion: {$namesJson}.
+                    For each criterion, pick the level whose cell best matches the response, then assign an integer score inside that level's point range (0-{$maxScorePerCriterion}). Cite evidence from the student response. Do not invent criteria.";
 
         $response = OpenAI::chat()->create([
             'model' => 'gpt-4o-mini',
@@ -361,7 +337,8 @@ class SubmissionController extends Controller
                 ['role' => 'system', 'content' => 'You are a system that only speaks in valid raw JSON schemas.'],
                 ['role' => 'user', 'content' => $aiPrompt],
             ],
-            'temperature' => 0.5,
+            'temperature' => 0,
+            'seed' => abs(crc32((string) $assignment->id.'|'.$prompt.'|'.$studentResponse)),
         ]);
 
         $rawContent = $response->choices[0]->message->content;
@@ -373,6 +350,128 @@ class SubmissionController extends Controller
         }
 
         return $data;
+    }
+
+    /**
+     * @param  array<int, mixed>  $levels
+     */
+    private function formattedRubricMatrix(Assignment $assignment, array $levels): string
+    {
+        $header = collect($levels)
+            ->map(function ($level): string {
+                $name = trim((string) ($level['name'] ?? 'Level'));
+                $range = trim((string) ($level['range'] ?? ''));
+
+                return $range === '' ? $name : "{$name} ({$range})";
+            })
+            ->implode(', ');
+
+        $rows = $assignment->criteria->map(function ($criterion) use ($levels): string {
+            $cells = $this->criterionCells($criterion);
+            $line = "Criterion \"{$criterion->name}\":";
+
+            if (filled($criterion->description)) {
+                $line .= " {$criterion->description}";
+            }
+
+            $details = collect($levels)
+                ->values()
+                ->map(function ($level, int $index) use ($cells): string {
+                    $name = trim((string) ($level['name'] ?? 'Level'));
+                    $range = trim((string) ($level['range'] ?? ''));
+                    $cell = trim((string) ($cells[$index] ?? ''));
+                    $label = $range === '' ? $name : "{$name} ({$range})";
+
+                    return $cell === '' ? "- {$label}" : "- {$label}: {$cell}";
+                })
+                ->implode("\n");
+
+            return $line."\n".$details;
+        })->implode("\n\n");
+
+        return "Levels: {$header}\n\n{$rows}";
+    }
+
+    /**
+     * @param  array<int, array{criterion_name?: mixed, score?: mixed, feedback?: mixed}>  $rawScores
+     * @return list<array{criterion_id: int, criterion_name: string, score: int, feedback: string}>
+     */
+    private function scoresForCriteria(Assignment $assignment, array $rawScores): array
+    {
+        $maxScore = $this->maxScorePerCriterion($this->assignmentLevels($assignment));
+        $byName = [];
+
+        foreach ($rawScores as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $key = $this->criterionKey((string) ($row['criterion_name'] ?? ''));
+
+            if ($key === '') {
+                continue;
+            }
+
+            $byName[$key] = $row;
+        }
+
+        return $assignment->criteria->map(function ($criterion) use ($byName, $maxScore) {
+            $match = $byName[$this->criterionKey((string) $criterion->name)] ?? [];
+            $score = is_numeric($match['score'] ?? null) ? (int) round((float) $match['score']) : 0;
+            $score = max(0, min($maxScore, $score));
+
+            return [
+                'criterion_id' => $criterion->id,
+                'criterion_name' => $criterion->name,
+                'score' => $score,
+                'feedback' => trim((string) ($match['feedback'] ?? '')),
+            ];
+        })->values()->all();
+    }
+
+    /**
+     * @return array<int, array{name?: mixed, range?: mixed}>
+     */
+    private function assignmentLevels(Assignment $assignment): array
+    {
+        $levels = is_array($assignment->levels) ? $assignment->levels : json_decode((string) $assignment->levels, true);
+
+        return is_array($levels) ? array_values($levels) : [];
+    }
+
+    /**
+     * @param  array<int, array{range?: mixed}>  $levels
+     */
+    private function maxScorePerCriterion(array $levels): int
+    {
+        if ($levels === []) {
+            return 0;
+        }
+
+        $maxLevel = $levels[array_key_last($levels)];
+        $rangeParts = explode('-', (string) ($maxLevel['range'] ?? '0-0'));
+
+        return (int) end($rangeParts);
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    private function criterionCells(Criterion $criterion): array
+    {
+        $cells = $criterion->cells;
+
+        if (is_string($cells)) {
+            $decoded = json_decode($cells, true);
+            $cells = is_array($decoded) ? $decoded : [];
+        }
+
+        return is_array($cells) ? array_values($cells) : [];
+    }
+
+    private function criterionKey(string $name): string
+    {
+        return mb_strtolower((string) preg_replace('/[^a-z0-9]+/i', '', $name));
     }
 
     /**
